@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probe Sheath Ion Lab</title>
+<style>
+/* Layout: instrument bench — square plasma window on the left, control rack on the right, teaching notes underneath. Single dark look by choice (a glowing discharge reads best on black). */
+:root {
+  color-scheme: dark;
+  --bg: #0b0e14;
+  --panel: #131823;
+  --line: #262e3d;
+  --fg: #e6e9ef;
+  --muted: #9aa3b4;
+  --ion: #5fd4e6;       /* inbound ions */
+  --orbit: #f2a541;     /* ions moving back out after entering the sheath */
+  --sheath: #7b6cf6;    /* sheath glow / accent */
+  --hit: #ffffff;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+header h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); line-height: 1.1; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+header p { margin: 0; color: var(--muted); max-width: 72ch; }
+header p.fine { font-size: 13px; margin-top: 6px; }
+.bench { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: 1fr; } }
+.stage { position: relative; background: radial-gradient(circle at 50% 50%, #151a29 0%, #0b0e14 70%); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; aspect-ratio: 1 / 1; max-width: 100%; }
+#sim { width: 100%; height: 100%; display: block; }
+.legend { position: absolute; left: 12px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.tag { position: absolute; right: 12px; top: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right; pointer-events: none; }
+.rack { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 12px; min-width: 0; }
+.card h2 { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+button { font: inherit; color: var(--fg); background: #1b2130; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; text-align: left; line-height: 1.25; }
+button:hover { border-color: #3a4560; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--sheath); outline-offset: 2px; }
+button.on { border-color: var(--sheath); background: rgba(123, 108, 246, 0.16); }
+button small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; }
+.row label { font-size: 14px; }
+.row output { font-family: var(--font-mono); font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--sheath); }
+.row .hint { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -2px; }
+.transport { display: flex; gap: 8px; flex-wrap: wrap; }
+.transport button { text-align: center; flex: 1 1 90px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; font-size: 13px; }
+.stats div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 3px; }
+.stats b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.meter { display: grid; gap: 4px; }
+.meter .bar { height: 10px; background: #1b2130; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.meter .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--ion), var(--sheath)); transition: width .4s; }
+.meter .lbl { display: flex; justify-content: space-between; font-size: 13px; }
+.meter .lbl b { font-family: var(--font-mono); font-weight: 500; }
+canvas.mini { width: 100%; height: 130px; display: block; }
+.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 8px; }
+.notes h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 0; }
+.notes ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 80ch; }
+.notes .eq { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .meter .fill { transition: none; } }
+</style>
+</head><body>
+
+<div class="wrap">
+  <header>
+    <h1>Probe Sheath Ion Lab</h1>
+    <p>Ions drift in from the plasma toward a negatively biased cylindrical Langmuir probe, seen end-on. Switch between the Laframboise (orbiting ions), ABR (radial ions) and collisional pictures and watch how many ions the probe actually collects.</p>
+    <p class="fine">Qualitative model for teaching: the potential profile is prescribed (log-shaped sheath, thickness from the Impedans manual Eq. 8), not solved self-consistently, and the presets use a high T<sub>i</sub>/T<sub>e</sub> so that orbits are easy to see. Use the doc's curves for numbers.</p>
+  </header>
+
+  <div class="bench">
+    <div class="stage" id="stage">
+      <canvas id="sim" role="img" aria-label="Animation of ions moving around a cylindrical probe and its sheath"></canvas>
+      <div class="tag" id="tag"></div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--ion)"></i>ion moving inward</span>
+        <span><i class="dot" style="background:var(--orbit)"></i>ion that entered the sheath, now moving out</span>
+        <span><i class="dot" style="background:transparent;border:1.5px solid var(--hit)"></i>collision</span>
+      </div>
+    </div>
+
+    <div class="rack">
+      <div class="card">
+        <h2>Theory</h2>
+        <div class="presets" id="presets">
+          <button data-p="laf" id="p-laf">Laframboise<small>collisionless, warm ions orbit</small></button>
+          <button data-p="abr" id="p-abr">ABR<small>cold ions fall radially</small></button>
+          <button data-p="oml" id="p-oml">OML limit<small>thin probe, huge sheath</small></button>
+          <button data-p="col" id="p-col">Collisional<small>high pressure, χ ≫ 1</small></button>
+        </div>
+        <div class="transport">
+          <button id="play">Pause</button>
+          <button id="reset">Reset counts</button>
+          <button id="trace">Trace one ion</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Plasma and probe</h2>
+        <div class="row"><label for="s-xi">Probe radius R<sub>p</sub>/λ<sub>D</sub></label><output id="o-xi"></output><input type="range" id="s-xi" min="0" max="100" step="1"><span class="hint">small = thin wire, big sheath relative to probe</span></div>
+        <div class="row"><label for="s-eta">Probe bias η<sub>p</sub> = −e(V − V<sub>s</sub>)/kT<sub>e</sub></label><output id="o-eta"></output><input type="range" id="s-eta" min="2" max="50" step="1"></div>
+        <div class="row"><label for="s-ti">Ion temperature T<sub>i</sub>/T<sub>e</sub></label><output id="o-ti"></output><input type="range" id="s-ti" min="0" max="100" step="1"><span class="hint">0 = cold ions, no angular momentum (ABR assumption)</span></div>
+        <div class="row"><label for="s-chi">Collisions across sheath χ<sub>i</sub> = s/λ<sub>i</sub></label><output id="o-chi"></output><input type="range" id="s-chi" min="0" max="100" step="1"><span class="hint">rises with gas pressure; each collision resets the ion to a thermal velocity</span></div>
+        <div class="row"><label for="s-speed">Playback speed</label><output id="o-speed"></output><input type="range" id="s-speed" min="10" max="300" step="5"></div>
+      </div>
+
+      <div class="card">
+        <h2>Counts</h2>
+        <div class="meter">
+          <div class="lbl"><span>Of the ions that entered the sheath and finished: fraction collected</span><b id="m-frac">–</b></div>
+          <div class="bar"><div class="fill" id="m-fill"></div></div>
+        </div>
+        <div class="stats">
+          <div><span>Injected</span><b id="c-in">0</b></div>
+          <div><span>Entered sheath</span><b id="c-sh">0</b></div>
+          <div><span>Collected</span><b id="c-col">0</b></div>
+          <div><span>Entered sheath, escaped</span><b id="c-esc">0</b></div>
+          <div><span>Collisions</span><b id="c-cx">0</b></div>
+          <div><span>Collected / injected</span><b id="c-ci">–</b></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Potential profile used</h2>
+        <canvas class="mini" id="prof" role="img" aria-label="Plot of normalised potential against radius"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <section class="notes" id="notes" aria-live="polite"></section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const C = { ion: css('--ion'), orbit: css('--orbit'), sheath: css('--sheath'), hit: css('--hit'), muted: css('--muted'), line: css('--line'), fg: css('--fg') };
+
+  // ---------- parameters (units: λD = 1, cs = 1, kTe = 1, M = 1) ----------
+  const P = { xi: 1, eta: 20, ti: 0.3, chi: 0, speed: 1 };
+  const xiFromS = s => Math.pow(10, -1 + 2.3 * s / 100);          // 0.1 … 20
+  const sFromXi = x => Math.round((Math.log10(x) + 1) / 2.3 * 100);
+  const chiFromS = s => s === 0 ? 0 : Math.pow(10, -2 + 3.3 * s / 100); // 0, 0.01 … 20
+  const sFromChi = c => c <= 0 ? 0 : Math.round((Math.log10(c) + 2) / 3.3 * 100);
+
+  const PRESETS = {
+    laf: { xi: 1, eta: 20, ti: 0.3, chi: 0, title: 'Laframboise: warm ions with angular momentum',
+      eq: 'Ueff(r) = eV(r) + Jθ²/2Mr²  →  collected only if E clears the barrier',
+      pts: ['Each ion arrives with a sideways (thermal) velocity, so it carries angular momentum about the probe.',
+            'Some ions enter the sheath, swing round the probe and leave again (orange); many more miss the sheath altogether. They add to the ion density near the probe but not to the current.',
+            'So collected / entered stays below 1 (about 0.95 at Ti/Te = 0.3 here; raise Ti/Te or shrink the probe to see more ions miss). Laframboise solved Poisson\'s equation with this orbit-dependent density, which is why his curves need a separate calculation for each Rp/λD.',
+            'Try: raise Ti/Te and watch more ions miss. Raise the bias η and watch the probe pull more of them in.'] },
+    abr: { xi: 1, eta: 20, ti: 0, chi: 0, title: 'ABR: cold ions fall straight in',
+      eq: 'd/dξ(ξ dη/dξ) = J η^(−1/2) − ξ e^(−η)',
+      pts: ['With Ti = 0 there is no sideways velocity and no angular momentum. Every path is a straight radial line.',
+            'Every ion that crosses the sheath edge is collected: collected / entered = 1.',
+            'Because no ion turns back, the flux at any radius is I/2πr regardless of probe size. That gives the universal ABR curves.',
+            'ABR therefore over-predicts current for a given density, so using it on measured data gives a density that is too low.'] },
+    oml: { xi: 0.15, eta: 20, ti: 0.3, chi: 0, title: 'OML limit: a thin wire in a huge sheath',
+      eq: 'I/I0 = (2/√π) η^(1/2)   (upper bound, no free parameters)',
+      pts: ['The probe is much smaller than the Debye length, so the sheath is huge compared with the probe.',
+            'Ions are steered only by energy and angular momentum conservation; the effective probe radius is Rp(1 + e|V|/E)^(1/2).',
+            'This is the Rp/λD → 0 limit of Laframboise, not a separate theory. Make the probe bigger with the slider and the Laframboise behaviour takes over.'] },
+    col: { xi: 1, eta: 20, ti: 0.05, chi: 5, title: 'Collisional sheath: collisions destroy the orbits',
+      eq: 'Ii = I_LAF γ1(χi) γ2(χi),   χi = (rs − rp)/λi,   λi = kTg/(p σ)',
+      pts: ['Charge-exchange collisions (white rings) replace a fast ion with a slow one moving in a random direction.',
+            'A few collisions (χ ≈ 0.1–1) remove angular momentum, so fewer ions orbit away and the collected fraction rises toward ABR.',
+            'Many collisions (χ ≫ 1) make ions random-walk; some drift back out to the plasma and the current falls, roughly as 1/χ.',
+            'Try: pick Laframboise, then slide χ from 0 to 20 and watch collected / injected. It edges up slightly near χ ≈ 0.5, then falls steeply (about 0.8 → 0.5 at χ = 3 → 0.03 at χ = 20). The manual\'s Figure A.1 shows a larger rise because its model applies collisions only inside the sheath; here they act in the presheath too.'] }
+  };
+
+  // ---------- geometry ----------
+  let G = {};
+  function geometry() {
+    const Rp = P.xi;
+    const s = Math.max(2, Math.sqrt((0.59 + 1.86 * Rp) * (P.eta + 3.5)) - 4); // manual Eq. 8 (λD units), floored
+    const rs = Rp + s;
+    const Rout = rs + Math.max(4, 0.6 * rs);
+    G = { Rp, rs, Rout, s, lnS: Math.log(rs / Rp), lnP: Math.log(Rout / rs) };
+  }
+  function eta(r) {
+    if (r >= G.Rout) return 0;
+    if (r >= G.rs) return 0.5 * Math.log(G.Rout / r) / G.lnP;
+    return 0.5 + (P.eta - 0.5) * Math.log(G.rs / r) / G.lnS;
+  }
+  function dEta(r) { // dη/dr (negative)
+    if (r >= G.Rout) return 0;
+    if (r >= G.rs) return -0.5 / (r * G.lnP);
+    return -(P.eta - 0.5) / (r * G.lnS);
+  }
+
+  // ---------- particles ----------
+  let ions = [], sparks = [], flashes = [];
+  const N = { in: 0, sh: 0, col: 0, esc: 0, cx: 0, done: 0 };
+  let traced = null, traceNext = false;
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+
+  function inject() {
+    const th = Math.random() * 2 * Math.PI, r = G.Rout * 0.999;
+    const vt = Math.sqrt(P.ti);
+    const vr = -(0.25 + vt * Math.abs(gauss()));
+    const vth = vt * gauss();
+    const c = Math.cos(th), s = Math.sin(th);
+    const ion = { x: r * c, y: r * s, vx: vr * c - vth * s, vy: vr * s + vth * c, inSh: false, trail: [], age: 0, traced: false };
+    if (traceNext) { ion.traced = true; ion.long = []; traced = ion; traceNext = false; }
+    ions.push(ion); N.in++;
+  }
+
+  function step(ion, dt) {
+    let rem = dt;
+    const vt = Math.sqrt(P.ti), lam = P.chi > 0 ? G.s / P.chi : Infinity;
+    while (rem > 0) {
+      const r = Math.hypot(ion.x, ion.y), v = Math.hypot(ion.vx, ion.vy);
+      const h = Math.min(rem, 0.03 * r / (v + 0.2), 0.05 * G.Rout);
+      // velocity Verlet with central force F = dη/dr r̂
+      let f = dEta(r); ion.vx += 0.5 * h * f * ion.x / r; ion.vy += 0.5 * h * f * ion.y / r;
+      ion.x += h * ion.vx; ion.y += h * ion.vy;
+      const r2 = Math.hypot(ion.x, ion.y);
+      f = dEta(r2); ion.vx += 0.5 * h * f * ion.x / r2; ion.vy += 0.5 * h * f * ion.y / r2;
+      rem -= h; ion.age += h;
+      if (!ion.inSh && r2 < G.rs) { ion.inSh = true; N.sh++; }
+      if (r2 <= G.Rp) { ion.dead = 'col'; return; }
+      if (r2 > G.Rout) { ion.dead = 'esc'; return; }
+      if (lam < Infinity) {
+        const vv = Math.hypot(ion.vx, ion.vy);
+        if (Math.random() < vv * h / lam) { // charge exchange: new slow ion, random direction
+          ion.vx = vt * gauss(); ion.vy = vt * gauss(); N.cx++;
+          sparks.push({ x: ion.x, y: ion.y, t: 0 });
+        }
+      }
+    }
+  }
+
+  // ---------- drawing ----------
+  const cv = $('sim'), ctx = cv.getContext('2d');
+  const pc = $('prof'), pctx = pc.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    const b = cv.getBoundingClientRect(); W = b.width; H = b.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    const pb = pc.getBoundingClientRect(); pc.width = Math.round(pb.width * DPR); pc.height = Math.round(pb.height * DPR);
+    drawProfile();
+  }
+  const sc = () => (Math.min(W, H) / 2 - 14) / G.Rout;
+
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const k = sc(), cx = W / 2, cy = H / 2;
+    // presheath boundary
+    ctx.setLineDash([4, 6]); ctx.strokeStyle = 'rgba(154,163,180,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, G.Rout * k, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    // sheath glow
+    const g = ctx.createRadialGradient(cx, cy, G.Rp * k, cx, cy, G.rs * k);
+    g.addColorStop(0, 'rgba(123,108,246,0.42)'); g.addColorStop(1, 'rgba(123,108,246,0.05)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, G.rs * k, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(123,108,246,0.75)'; ctx.lineWidth = 1.25; ctx.beginPath(); ctx.arc(cx, cy, G.rs * k, 0, 7); ctx.stroke();
+    // probe
+    const pr = Math.max(2.5, G.Rp * k);
+    const pg = ctx.createRadialGradient(cx - pr * 0.3, cy - pr * 0.3, pr * 0.1, cx, cy, pr);
+    pg.addColorStop(0, '#d9dde6'); pg.addColorStop(1, '#6b7385');
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(cx, cy, pr, 0, 7); ctx.fill();
+    // labels
+    ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif'; ctx.fillStyle = C.muted; ctx.textAlign = 'center';
+    ctx.fillText('sheath edge  r = rs', cx, cy - G.rs * k - 6);
+    ctx.fillText('presheath boundary', cx, cy - G.Rout * k + 16);
+    ctx.fillStyle = C.fg; ctx.fillText('probe', cx, cy + Math.max(2.5, G.Rp * k) + 14);
+    // collection flashes
+    flashes = flashes.filter(f => (f.t += 1) < 18);
+    for (const f of flashes) { ctx.fillStyle = `rgba(255,255,255,${0.9 * (1 - f.t / 18)})`; ctx.beginPath(); ctx.arc(cx + f.x * k, cy + f.y * k, 3, 0, 7); ctx.fill(); }
+    // ions
+    for (const ion of ions) {
+      const r = Math.hypot(ion.x, ion.y), vr = (ion.x * ion.vx + ion.y * ion.vy) / r;
+      const col = ion.inSh && vr > 0 ? C.orbit : C.ion;
+      if (ion.trail.length > 1) {
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2; ctx.beginPath();
+        ion.trail.forEach((p, i) => i ? ctx.lineTo(cx + p[0] * k, cy + p[1] * k) : ctx.moveTo(cx + p[0] * k, cy + p[1] * k));
+        ctx.lineTo(cx + ion.x * k, cy + ion.y * k); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx + ion.x * k, cy + ion.y * k, 2.4, 0, 7); ctx.fill();
+    }
+    // traced ion long path
+    if (traced && traced.long && traced.long.length > 1) {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath();
+      traced.long.forEach((p, i) => i ? ctx.lineTo(cx + p[0] * k, cy + p[1] * k) : ctx.moveTo(cx + p[0] * k, cy + p[1] * k));
+      ctx.stroke();
+      const last = traced.long.at(-1);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx + last[0] * k, cy + last[1] * k, 4, 0, 7); ctx.fill();
+      if (traced.result) { ctx.font = '600 13px "IBM Plex Sans", system-ui'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText(traced.result, 14, 22); }
+    }
+    // collision sparks
+    sparks = sparks.filter(s => (s.t += 1) < 22);
+    for (const s of sparks) { ctx.strokeStyle = `rgba(255,255,255,${0.85 * (1 - s.t / 22)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx + s.x * k, cy + s.y * k, 2 + s.t * 0.4, 0, 7); ctx.stroke(); }
+  }
+
+  function drawProfile() {
+    if (!G.Rp) return;
+    const w = pc.width / DPR, h = pc.height / DPR;
+    pctx.setTransform(DPR, 0, 0, DPR, 0, 0); pctx.clearRect(0, 0, w, h);
+    const L = 36, R = w - 10, T = 10, B = h - 24;
+    const X = r => L + (r - G.Rp) / (G.Rout - G.Rp) * (R - L);
+    const Y = e => B - Math.log10(1 + e) / Math.log10(1 + P.eta) * (B - T);
+    pctx.strokeStyle = C.line; pctx.lineWidth = 1; pctx.beginPath(); pctx.moveTo(L, T); pctx.lineTo(L, B); pctx.lineTo(R, B); pctx.stroke();
+    // sheath edge
+    pctx.setLineDash([3, 4]); pctx.strokeStyle = 'rgba(123,108,246,0.8)'; pctx.beginPath(); pctx.moveTo(X(G.rs), T); pctx.lineTo(X(G.rs), B); pctx.stroke(); pctx.setLineDash([]);
+    pctx.strokeStyle = C.ion; pctx.lineWidth = 2; pctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const r = G.Rp + (G.Rout - G.Rp) * i / 200; const x = X(r), y = Y(eta(r)); i ? pctx.lineTo(x, y) : pctx.moveTo(x, y); }
+    pctx.stroke();
+    pctx.font = '11px "IBM Plex Mono", monospace'; pctx.fillStyle = C.muted;
+    pctx.textAlign = 'left'; pctx.fillText('ηp = ' + P.eta + ' at probe', L + 40, T + 10);
+    pctx.fillText('rs', X(G.rs) + 4, B - 6);
+    pctx.textAlign = 'right'; pctx.fillText('η = 0.5 at sheath edge', R, T + 10);
+    pctx.textAlign = 'left'; pctx.fillText('Rp', L - 4, B + 14); pctx.textAlign = 'right'; pctx.fillText('r = ' + G.Rout.toFixed(1) + ' λD', R, B + 14); pctx.textAlign = 'center'; pctx.fillText('radius r (linear)', (L + R) / 2, B + 14);
+    pctx.save(); pctx.translate(12, (T + B) / 2); pctx.rotate(-Math.PI / 2); pctx.fillText('η (log scale)', 0, 0); pctx.restore();
+  }
+
+  // ---------- UI ----------
+  const fmt = (x, d = 2) => x >= 10 ? x.toFixed(0) : x.toFixed(d);
+  function syncOutputs() {
+    $('o-xi').textContent = fmt(P.xi);
+    $('o-eta').textContent = P.eta.toFixed(0);
+    $('o-ti').textContent = P.ti.toFixed(2);
+    $('o-chi').textContent = P.chi === 0 ? '0 (collisionless)' : fmt(P.chi);
+    $('o-speed').textContent = P.speed.toFixed(1) + '×';
+    $('tag').innerHTML = `Rp/λD = ${fmt(P.xi)}<br>sheath s = ${G.s.toFixed(1)} λD<br>χi = ${P.chi === 0 ? '0' : fmt(P.chi)}`;
+  }
+  function resetCounts() { for (const k in N) N[k] = 0; ions = []; sparks = []; flashes = []; traced = null; history = []; }
+  function apply(changedGeom) { geometry(); syncOutputs(); drawProfile(); if (changedGeom) resetCounts(); }
+
+  function setSliders() {
+    $('s-xi').value = sFromXi(P.xi); $('s-eta').value = P.eta; $('s-ti').value = Math.round(P.ti * 100);
+    $('s-chi').value = sFromChi(P.chi); $('s-speed').value = Math.round(P.speed * 100);
+  }
+  function choose(key) {
+    const p = PRESETS[key]; Object.assign(P, { xi: p.xi, eta: p.eta, ti: p.ti, chi: p.chi });
+    document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === key));
+    setSliders(); apply(true);
+    $('notes').innerHTML = `<h2>${p.title}</h2><div class="eq">${p.eq}</div><ul>${p.pts.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  }
+  const clearPreset = () => document.querySelectorAll('#presets button').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', () => choose(b.dataset.p)));
+  $('s-xi').addEventListener('input', e => { P.xi = xiFromS(+e.target.value); clearPreset(); apply(true); });
+  $('s-eta').addEventListener('input', e => { P.eta = +e.target.value; clearPreset(); apply(true); });
+  $('s-ti').addEventListener('input', e => { P.ti = +e.target.value / 100; clearPreset(); apply(true); });
+  $('s-chi').addEventListener('input', e => { P.chi = chiFromS(+e.target.value); clearPreset(); apply(true); });
+  $('s-speed').addEventListener('input', e => { P.speed = +e.target.value / 100; syncOutputs(); });
+  let running = true;
+  $('play').addEventListener('click', () => { running = !running; $('play').textContent = running ? 'Pause' : 'Play'; if (running) last = performance.now(); });
+  $('reset').addEventListener('click', resetCounts);
+  $('trace').addEventListener('click', () => { traced = null; traceNext = true; });
+
+  let history = [];
+  function updateStats() {
+    $('c-in').textContent = N.in; $('c-sh').textContent = N.sh; $('c-col').textContent = N.col;
+    $('c-esc').textContent = N.esc; $('c-cx').textContent = N.cx;
+    $('c-ci').textContent = N.done > 20 ? (N.col / N.done).toFixed(2) : '–';
+    const fin = N.col + N.esc; const f = fin > 10 ? N.col / fin : null;
+    $('m-frac').textContent = f === null ? '–' : f.toFixed(2);
+    $('m-fill').style.width = f === null ? '0%' : (f * 100).toFixed(0) + '%';
+  }
+
+  // ---------- loop ----------
+  let last = performance.now(), acc = 0, statT = 0;
+  function frame(now) {
+    const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
+    if (running) {
+      const simRate = G.Rout / 5 * P.speed;     // domain crossed in ~5 s at 1×
+      const dt = dtReal * simRate;
+      acc += dtReal * 30 * P.speed;              // ~30 ions per second at 1×
+      while (acc >= 1 && ions.length < 420) { inject(); acc -= 1; }
+      if (acc > 1) acc = 1;
+      for (const ion of ions) {
+        step(ion, dt);
+        ion.trail.push([ion.x, ion.y]); if (ion.trail.length > 14) ion.trail.shift();
+        if (ion.traced && !ion.dead) ion.long.push([ion.x, ion.y]);
+        if (!ion.dead && ion.age > 60 * G.Rout) ion.dead = 'lost';
+        if (ion.dead && ion.warm) continue;
+        if (ion.dead) {
+          N.done++;
+          if (ion.dead === 'col') { N.col++; flashes.push({ x: ion.x, y: ion.y, t: 0 }); }
+          if (ion.dead === 'esc' && ion.inSh) N.esc++;
+          if (ion.traced) { ion.long.push([ion.x, ion.y]); ion.result = ion.dead === 'col' ? 'Traced ion: collected by the probe' : (ion.inSh ? 'Traced ion: entered the sheath, orbited and escaped' : 'Traced ion: missed the sheath and left'); }
+        }
+      }
+      ions = ions.filter(i => !i.dead);
+      statT += dtReal; if (statT > 0.2) { updateStats(); statT = 0; }
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  new ResizeObserver(resize).observe($('stage'));
+  window.addEventListener('resize', resize);
+  choose('laf');
+  resize();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { running = false; $('play').textContent = 'Play'; }
+  // warm start so the first frame already shows ions in flight
+  for (let i = 0; i < 90; i++) { inject(); for (const ion of ions) step(ion, G.Rout / 5 / 30); ions = ions.filter(x => !x.dead); }
+  for (const k in N) N[k] = 0; ions.forEach(x => { x.warm = true; });
+  requestAnimationFrame(t => { last = t; frame(t); });
+})();
+</script>
+</body></html>
