@@ -1,0 +1,255 @@
+<title>Plasma OES Analyzer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab workbench — a sticky header with the active condition, a step-tab rail, and one working panel per analysis step. */
+:root{
+  --bg:#f2f5f5; --panel:#ffffff; --ink:#14212a; --muted:#5a6872; --line:#d7dfe1; --soft:#eaf0f1;
+  --accent:#0d6b7f; --accent-soft:rgba(13,107,127,.10); --accent-ink:#ffffff;
+  --good:#1f7a4d; --good-soft:rgba(31,122,77,.10); --warn:#9a5b00; --warn-soft:rgba(154,91,0,.10); --bad:#a3302b; --bad-soft:rgba(163,48,43,.09);
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1416; --panel:#151d20; --ink:#e3eaec; --muted:#93a3ab; --line:#27343a; --soft:#1b2529;
+  --accent:#4fb6c9; --accent-soft:rgba(79,182,201,.14); --accent-ink:#06191d;
+  --good:#5ec58f; --good-soft:rgba(94,197,143,.12); --warn:#f0ad4e; --warn-soft:rgba(240,173,78,.12); --bad:#f08a80; --bad-soft:rgba(240,138,128,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1416; --panel:#151d20; --ink:#e3eaec; --muted:#93a3ab; --line:#27343a; --soft:#1b2529;
+  --accent:#4fb6c9; --accent-soft:rgba(79,182,201,.14); --accent-ink:#06191d;
+  --good:#5ec58f; --good-soft:rgba(94,197,143,.12); --warn:#f0ad4e; --warn-soft:rgba(240,173,78,.12); --bad:#f08a80; --bad-soft:rgba(240,138,128,.12); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between}
+.brand{display:flex;flex-direction:column;gap:2px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-stretch:80%;font-weight:750;font-size:clamp(22px,3vw,30px);line-height:1.05;margin:0;letter-spacing:-.01em}
+h2{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:18px;margin:0;text-wrap:balance}
+h3{font-size:14px;font-weight:600;margin:0}
+.condsel{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-family:var(--f-mono);font-size:11px;padding:3px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+nav.tabs button{font:inherit;font-size:13px;white-space:nowrap;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:7px 12px;cursor:pointer;display:flex;gap:7px;align-items:center}
+nav.tabs button .n{font-family:var(--f-mono);font-size:11px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--muted)}
+nav.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+nav.tabs button[aria-selected="true"] .n{background:rgba(255,255,255,.25);color:inherit}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px}
+@media (max-width:980px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.sub{color:var(--muted);font-size:12.5px;margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:75ch}
+button.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:6px 12px;cursor:pointer}
+button.btn:hover{border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.primary:hover{color:var(--accent-ink);filter:brightness(1.08)}
+button.link{font:inherit;font-size:12px;border:0;background:none;color:var(--accent);cursor:pointer;padding:0 2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+label.inline{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink)}
+input[type=number],input[type=text],select{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px;min-width:0}
+input[type=number]{font-family:var(--f-mono);width:100px}
+input.wide{width:100%}
+.drop{border:1.5px dashed var(--line);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chips{display:flex;flex-direction:column;gap:4px}
+.chip{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12.5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip .mt{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.chip .acts{display:flex;gap:6px}
+.cond{border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.cond.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.cond .files{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.status{font-size:12.5px;display:flex;flex-direction:column;gap:4px}
+.msg{padding:7px 10px;border-radius:6px;font-size:12.5px;border-left:3px solid}
+.msg.warn{background:var(--warn-soft);border-color:var(--warn)} .msg.bad{background:var(--bad-soft);border-color:var(--bad)} .msg.good{background:var(--good-soft);border-color:var(--good)} .msg.info{background:var(--accent-soft);border-color:var(--accent)}
+.plot{width:100%;min-width:0}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:600;color:var(--muted);background:var(--soft);position:sticky;top:0}
+td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tr.off td{color:var(--muted)}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--accent-soft)}
+td input[type=number]{width:84px;padding:2px 6px}
+.flag{font-family:var(--f-mono);font-size:10.5px;padding:1px 6px;border-radius:999px;margin-right:4px;display:inline-block}
+.flag.m{background:var(--warn-soft);color:var(--warn)} .flag.b{background:var(--bad-soft);color:var(--bad)} .flag.l{background:var(--soft);color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:11.5px;color:var(--muted)} .kpi .v{font-family:var(--f-mono);font-size:17px;font-variant-numeric:tabular-nums;font-weight:500} .kpi .v small{font-size:11.5px;color:var(--muted);font-weight:400}
+.kpi.main{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.verdict{border-radius:9px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;border:1px solid}
+.verdict.ok{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 40%,transparent)}
+.verdict.no{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.verdict table td{white-space:normal}
+.verdict table td.num{white-space:nowrap}
+.verdict ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.eq{font-family:var(--f-mono);font-size:12.5px;background:var(--soft);border-radius:7px;padding:10px 12px;line-height:1.7;overflow-x:auto}
+details.note{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg)}
+details.note summary{cursor:pointer;font-weight:600;font-size:13px}
+details.note > div{margin-top:8px;display:flex;flex-direction:column;gap:8px;font-size:13px;max-width:85ch}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{font:inherit;font-size:12.5px;border:0;background:transparent;color:var(--muted);padding:5px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="eyebrow">Optical emission spectroscopy · Ar plasma</span><h1>Plasma OES Analyzer</h1></div>
+    <div class="condsel"><label class="inline" for="activeCond">Condition</label><select id="activeCond"></select><span class="badge" id="exBadge" hidden>synthetic example data</span></div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-t="data" aria-selected="true"><span class="n">1</span>Data</button>
+    <button role="tab" data-t="spec" aria-selected="false"><span class="n">2</span>Spectrum &amp; peaks</button>
+    <button role="tab" data-t="boltz" aria-selected="false"><span class="n">3</span>Boltzmann &amp; LTE check</button>
+    <button role="tab" data-t="rot" aria-selected="false"><span class="n">4</span>Gas temperature (N₂)</button>
+    <button role="tab" data-t="hr" aria-selected="false"><span class="n">5</span>nₑ from Ar 696.5 nm</button>
+    <button role="tab" data-t="res" aria-selected="false"><span class="n">6</span>Results &amp; export</button>
+  </nav>
+
+  <!-- 1 DATA -->
+  <section class="panel" id="t-data">
+    <div class="row" style="justify-content:space-between"><h2>Measurements</h2>
+      <div class="row"><button class="btn" id="addCond">Add condition</button><button class="btn" id="loadEx">Load example data</button><button class="btn" id="clearAll">Remove all</button></div></div>
+    <p class="lede">Each condition holds its triplicate plasma spectra and triplicate backgrounds as two-column files (wavelength in nm, intensity). Header lines are skipped, and comma, tab, semicolon or space separators all work. Optional: a high-resolution record of the Ar I 696.5 nm line for the electron-density tab.</p>
+    <div class="drop" id="quickDrop"><div class="hd"><h3>Quick add: drop all files for one condition here</h3><label class="btn" style="display:inline-block">Choose files<input type="file" id="quickInput" multiple hidden></label></div>
+      <p class="sub">Files are sorted by name: <b>bg</b>, <b>background</b>, <b>dark</b> or <b>blank</b> → background; <b>696</b>, <b>hires</b> or <b>hr</b> → high-resolution set; anything else → plasma. You can move files afterwards.</p></div>
+    <div id="condList" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div class="panel" style="background:var(--bg)">
+      <h3>Processing settings (all conditions)</h3>
+      <div class="row">
+        <label class="f"><span>Intensity units</span><div class="seg" id="unitSeg"><button data-v="energy" aria-pressed="true">Response-corrected (energy)</button><button data-v="photon" aria-pressed="false">Raw counts (photons)</button></div></label>
+        <label class="f"><span>Wavelength correction</span><div class="seg" id="shiftSeg"><button data-v="auto" aria-pressed="true">Auto from Ar I lines</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="none" aria-pressed="false">None</button></div></label>
+        <label class="f" for="shiftVal"><span>Manual shift (nm, measured − true)</span><input type="number" id="shiftVal" step="0.01" value="0"></label>
+        <label class="f" for="satLvl"><span>Saturation level (counts)</span><input type="number" id="satLvl" step="1" value="65000"></label>
+      </div>
+      <p class="sub">Your spectra are already corrected for spectral response, so "energy" units apply: the Boltzmann plot uses ln(Iλ/gA). Choose "photons" only for uncorrected detector counts; it then uses ln(I/gA), but uncorrected counts across 415–810 nm will still bias the temperature.</p>
+    </div>
+  </section>
+
+  <!-- 2 SPECTRUM -->
+  <section class="panel" id="t-spec" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Net spectrum and peak identification</h2>
+      <div class="row"><button class="btn" id="specPng">Save plot (PNG)</button><button class="btn" id="specCsv">Export spectrum CSV</button><button class="btn" id="peakCsv">Export peak table</button></div></div>
+    <div class="row">
+      <label class="inline"><input type="checkbox" id="showReps"> Replicates</label>
+      <label class="inline"><input type="checkbox" id="showBg"> Mean background</label>
+      <label class="inline"><input type="checkbox" id="logY"> Log scale</label>
+      <label class="inline"><input type="checkbox" id="showLabels" checked> Peak labels</label>
+      <label class="f" for="pkThr"><span>Threshold (× noise σ)</span><input type="number" id="pkThr" value="8" step="1" min="2"></label>
+      <label class="f" for="pkSep"><span>Min. separation (nm)</span><input type="number" id="pkSep" value="0.3" step="0.05"></label>
+      <label class="f" for="pkTol"><span>Match tolerance (nm)</span><input type="number" id="pkTol" value="0.25" step="0.05"></label>
+    </div>
+    <div class="row" id="zooms"></div>
+    <div id="plotSpec" class="plot" style="height:470px"></div>
+    <div class="status" id="specStatus"></div>
+    <div class="tbl-wrap" style="max-height:340px"><table id="peakTbl"></table></div>
+  </section>
+
+  <!-- 3 BOLTZMANN -->
+  <section class="panel" id="t-boltz" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Ar I Boltzmann plot → excitation temperature</h2>
+      <div class="row"><button class="btn" id="boltzPng">Save plot (PNG)</button><button class="btn" id="boltzCsv">Export Boltzmann table</button></div></div>
+    <div class="eq">ln( I<sub>ki</sub>·λ<sub>ki</sub> / (g<sub>k</sub>A<sub>ki</sub>) ) = −E<sub>k</sub> / (k<sub>B</sub>T<sub>exc</sub>) + const &nbsp;&nbsp;→&nbsp;&nbsp; T<sub>exc</sub> = −1 / (k<sub>B</sub> · slope), &nbsp; k<sub>B</sub> = 8.617×10⁻⁵ eV/K<br><span class="sub" id="unitNote"></span></div>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div id="plotBoltz" class="plot" style="height:400px"></div>
+        <div class="kpis" id="boltzKpis"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div id="lteBox"></div>
+        <div class="row"><label class="f" for="neLTE"><span>nₑ for the McWhirter test (cm⁻³)</span><input type="number" id="neLTE" step="any" placeholder="from tab 5" style="width:150px"></label><button class="link" id="neFromHr">Use nₑ from tab 5</button></div>
+      </div>
+    </div>
+    <div class="panel" style="background:var(--bg);gap:10px">
+      <div class="row"><label class="f"><span>Intensity source</span><div class="seg" id="imodeSeg"><button data-v="area" aria-pressed="true">Integrated area (auto)</button><button data-v="peakA" aria-pressed="false">Peak finder: area</button><button data-v="peakH" aria-pressed="false">Peak finder: height</button><button data-v="manual" aria-pressed="false">Manual entry</button></div></label>
+        <label class="f" for="hw"><span>Integration half-width (nm)</span><input type="number" id="hw" value="0.35" step="0.05"></label></div>
+      <p class="sub" id="imodeNote"></p>
+      <div class="row"><button class="btn" id="incAll">Include all available</button><button class="btn" id="incNone">Clear selection</button><button class="btn" id="incDefault">Default selection</button><button class="btn" id="hideMissing" aria-pressed="false">Hide unavailable lines</button><button class="btn" id="resetConst">Reset constants</button></div>
+      <div class="row" id="manualTools"><button class="btn" id="copyManual">Copy current intensities to manual</button><button class="btn" id="clearManual">Clear manual values</button></div>
+      <details class="note" id="pasteBox"><summary>Paste intensities (λ, I, optional SD — one line per row)</summary><div>
+        <textarea id="pasteTxt" rows="6" style="width:100%;font-family:var(--f-mono);font-size:12.5px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px" placeholder="696.54, 1520, 45&#10;706.72  1610  50&#10;750.39	2830"></textarea>
+        <div class="row"><button class="btn primary" id="pasteApply">Apply to manual values</button><span class="sub">Each wavelength is matched to the nearest listed Ar I line within 0.3 nm. Commas, tabs or spaces are all fine.</span></div></div></details>
+    </div>
+    <div class="tbl-wrap" style="max-height:420px"><table id="boltzTbl"></table></div>
+    <details class="note"><summary>Why the Boltzmann plot can fail, and what to do next (collisional–radiative modelling)</summary><div>
+      <p>The Boltzmann plot assumes the emitting levels are populated according to a Boltzmann distribution, which requires electron collisions to dominate over radiative decay (local thermodynamic equilibrium, LTE). In atmospheric-pressure argon plasma jets nₑ is typically 10¹³–10¹⁶ cm⁻³, far below the McWhirter limit for full LTE (~10¹⁷ cm⁻³). The 4p (2p) levels are then populated by electron impact from the ground state <em>and</em> from the metastable 1s levels, and they are depopulated by radiation and quenching. The fitted "temperature" can then depend on which lines you choose.</p>
+      <p><b>Signs that LTE fails:</b> a poor straight-line fit; 4p-only and 4p→5p slopes that disagree; lines from the same upper level that disagree (more often self-absorption or calibration error); or nₑ below the McWhirter criterion.</p>
+      <p><b>What to use instead:</b> a collisional–radiative (CR) model of the Ar 1s/2p system, which predicts line ratios as a function of Tₑ, nₑ and metastable density. Examples: X.-M. Zhu and Y.-K. Pu, "A simple collisional–radiative model for low-temperature argon discharges with pressure ranging from 1 Pa to atmospheric pressure", J. Phys. D 43 015204 (2010); S. Siepa et al., "On the OES line-ratio technique in argon and argon-containing plasmas", J. Phys. D 47 445201 (2014). Students can compare measured ratios such as 750.4/751.5 or 696.5/750.4 with CR-model curves.</p>
+      <p><b>Line list:</b> all tabulated Ar I lines up to 900 nm are listed; those outside your measured range are greyed out. Lines marked <span class="flag l">verify</span> have constants that should be checked against the NIST Atomic Spectra Database before quantitative use; you can edit E<sub>k</sub>, g<sub>k</sub> and A<sub>ki</sub> in the table. The 545–565 nm values follow Ohno et al., Plasma Fusion Res. 1, 028 (2006).</p><p><b>Intensity sources:</b> "Integrated area" integrates each line over ± half-width with a local baseline, per replicate. "Peak finder" uses only lines that tab 2 detected (above its threshold) and integrates or takes the height at the detected centre. Heights are valid only if all lines share the same instrumental width. "Manual" lets students type, or paste, intensities from their own processing; replicate temperatures are then unavailable, but an SD per line can be given.</p><p><b>Default line selection:</b> 811.5 and 763.5 nm (strong lines to the 1s5 metastable, prone to self-absorption) and the 419.8/420.1 nm pair (blended at most resolutions) are excluded by default. You can tick them back in to see their effect.</p>
+    </div></details>
+  </section>
+
+  <!-- 4 ROTATIONAL -->
+  <section class="panel" id="t-rot" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Rotational (gas) temperature from N₂ C–B (0,0) at 337 nm</h2>
+      <div class="row"><button class="btn" id="rotPng">Save plot (PNG)</button><button class="btn" id="rotCsv">Export fit CSV</button><button class="btn" id="moesExp">Export for massiveOES</button></div></div>
+    <div class="row">
+      <label class="f" for="rotLo"><span>Window from (nm)</span><input type="number" id="rotLo" value="334.6" step="0.1"></label>
+      <label class="f" for="rotHi"><span>to (nm)</span><input type="number" id="rotHi" value="337.6" step="0.1"></label>
+      <label class="inline"><input type="checkbox" id="rotFixW"> Fix instrument FWHM</label>
+      <label class="f" for="rotW"><span>Instrument FWHM (nm)</span><input type="number" id="rotW" value="0.15" step="0.01"></label>
+      <button class="btn" id="measW">Measure from Ar I line</button>
+      <button class="btn primary" id="rotFit">Fit this condition</button><button class="btn" id="rotFitAll">Fit all conditions</button>
+    </div>
+    <div class="grid2">
+      <div id="plotRot" class="plot" style="height:430px"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0"><div class="kpis" id="rotKpis"></div><div id="plotProf" class="plot" style="height:230px"></div></div>
+    </div>
+    <div class="status" id="rotStatus"></div>
+    <details class="note"><summary>Model, assumptions and when to use massiveOES instead</summary><div>
+      <p>The simulation treats the C³Πᵤ → B³Π_g (0,0) band as a Π–Π transition with unresolved triplet fine structure: P, Q and R branches with Hönl–London factors and rotational constants B′ = 1.8154 cm⁻¹ and B″ = 1.6285 cm⁻¹. Upper-level populations follow a Boltzmann distribution at T<sub>rot</sub>, and lines are convolved with a Gaussian instrument function. The band origin is pinned so the head falls at 337.13 nm (air), and a small shift is fitted.</p>
+      <p>This is adequate for teaching and for comparing conditions measured on the same instrument (typically within ±10–15% of a full model when the FWHM is ≥ 0.1 nm). For publication-quality temperatures, export the spectrum and fit it with <b>massiveOES</b> (Voráč et al., Masaryk University), which uses full line databases for N₂, OH and other molecules.</p>
+      <p><b>Physics caveats:</b> T<sub>rot</sub>(N₂ C) ≈ T<sub>gas</sub> only if the C state is created by electron impact from ground-state N₂ and lives long enough to thermalise. In argon, energy transfer from Ar metastables can overpopulate high rotational levels and inflate T<sub>rot</sub>. Compare with OH(A) where possible, and keep the fit window clear of the (1,1) head at 333.9 nm.</p>
+    </div></details>
+  </section>
+
+  <!-- 5 HIGH-RES 696.5 -->
+  <section class="panel" id="t-hr" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Electron density from Ar I 696.5 nm line broadening</h2>
+      <div class="row"><button class="btn" id="hrPng">Save plot (PNG)</button><button class="btn" id="hrCsv">Export fit CSV</button></div></div>
+    <div class="eq">W<sub>G</sub> = √(W<sub>I</sub>² + W<sub>D</sub>²), &nbsp; W<sub>D</sub> = 7.16×10⁻⁷ λ √(T<sub>g</sub>/M) &nbsp;·&nbsp; Voigt fit → W<sub>L</sub> = W<sub>Stark</sub> + W<sub>vdW</sub><br>
+      W<sub>vdW</sub> = C · (P/1 atm) / T<sub>g</sub><sup>0.7</sup>, &nbsp; C = 7.5×10⁻⁷ λ² ⟨R²⟩<sup>2/5</sup> &nbsp;·&nbsp; n<sub>e</sub> = 10¹⁶ cm⁻³ × W<sub>Stark</sub> / w<sub>S</sub></div>
+    <div class="row">
+      <label class="f" for="hrWI"><span>Instrument FWHM W<sub>I</sub> (nm)</span><input type="number" id="hrWI" value="0.025" step="0.001"></label>
+      <label class="f"><span>Gas temperature T<sub>g</sub></span><div class="seg" id="tgSeg"><button data-v="rot" aria-pressed="true">From N₂ fit</button><button data-v="manual" aria-pressed="false">Manual</button></div></label>
+      <label class="f" for="hrTg"><span>T<sub>g</sub> manual (K)</span><input type="number" id="hrTg" value="400" step="10"></label>
+      <label class="f" for="hrP"><span>Pressure (atm)</span><input type="number" id="hrP" value="1" step="0.05"></label>
+      <label class="f" for="hrWS"><span>Stark w<sub>S</sub> (nm per 10¹⁶ cm⁻³)</span><input type="number" id="hrWS" value="0.0112" step="0.0001"></label>
+      <label class="f" for="hrC"><span>vdW C (nm·K<sup>0.7</sup>)</span><input type="number" id="hrC" step="0.001"></label>
+      <label class="f" for="hrCunc"><span>vdW uncertainty (%)</span><input type="number" id="hrCunc" value="15" step="1"></label>
+      <label class="inline"><input type="checkbox" id="hrFreeG"> Fit Gaussian width too</label>
+      <button class="btn primary" id="hrFit">Fit 696.5 nm line</button>
+    </div>
+    <div class="grid2">
+      <div id="plotHr" class="plot" style="height:420px"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0"><div class="kpis" id="hrKpis"></div><div class="status" id="hrStatus"></div></div>
+    </div>
+    <div class="tbl-wrap"><table id="hrTbl"></table></div>
+    <details class="note"><summary>Parameters, sources and limits</summary><div>
+      <p><b>Stark coefficient:</b> the default w<sub>S</sub> = 0.0112 nm (FWHM at nₑ = 10¹⁶ cm⁻³, Tₑ ≈ 10⁴ K) reproduces the published conversion of Lu et al., Sci. Rep. 4, 7488 (2014): W<sub>Stark</sub> = 0.038 nm ↔ nₑ = 3.4×10¹⁶ cm⁻³. Check it against Konjević &amp; Konjević, Spectrochim. Acta B 52, 2077 (1997) or Griem's tables before using results quantitatively; the electron-temperature dependence and the small ion-broadening term are neglected.</p>
+      <p><b>van der Waals:</b> C follows Yubero et al. (as used in Atoms 5, 41, 2017) with ⟨R²⟩ = ⟨R²<sub>up</sub>⟩ − ⟨R²<sub>low</sub>⟩ from the Coulomb approximation (2p₂ upper, 1s₅ lower): ⟨R²⟩ ≈ 36.6 a₀², C ≈ 1.54 nm·K<sup>0.7</sup>, so W<sub>vdW</sub> ≈ 0.025 nm at 350 K. Resonance broadening is negligible because the lower level (1s₅) is metastable.</p>
+      <p><b>Detection limit:</b> at 1 atm the van der Waals width (~0.02–0.03 nm) is much larger than the Stark width below ~10¹⁵ cm⁻³ (≤ 0.001 nm). Small errors in T<sub>g</sub> or C then swamp the Stark part, and the tab reports nₑ as an upper limit. Use a spectrometer with W<sub>I</sub> ≲ 0.03 nm, and measure W<sub>I</sub> with a narrow lamp line near 696 nm at the same slit.</p>
+    </div></details>
+  </section>
+
+  <!-- 6 RESULTS -->
+  <section class="panel" id="t-res" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Results across conditions</h2>
+      <div class="row"><button class="btn" id="resRun">Recompute all (incl. fits)</button><button class="btn" id="resCsv">Export summary CSV</button></div></div>
+    <p class="sub">Values are mean ± standard deviation over the replicates (n = 3); "fit ±" is the uncertainty of the fit to the mean spectrum. Ratios are band or line integrals relative to Ar I 750.4 nm.</p>
+    <div class="tbl-wrap"><table id="resTbl"></table></div>
+    <div class="grid2"><div id="plotResT" class="plot" style="height:320px"></div><div id="plotResR" class="plot" style="height:320px"></div></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>

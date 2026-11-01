@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Plasma Spectroscopy Teaching Tools</title>
+<style>
+:root{--bg:#f2f5f5;--panel:#fff;--ink:#14212a;--muted:#5a6872;--line:#d7dfe1;--accent:#0d6b7f}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1416;--panel:#151d20;--ink:#e3eaec;--muted:#93a3ab;--line:#27343a;--accent:#4fb6c9;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:40px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+main{max-width:920px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.eyebrow{font:12px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.1;margin:4px 0 8px;text-wrap:balance}
+p{margin:0;max-width:68ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+a.card{display:flex;flex-direction:column;gap:10px;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:inherit;text-decoration:none}
+a.card:hover,a.card:focus-visible{border-color:var(--accent);outline:none}
+a.card h2{margin:0;font-size:20px;color:var(--accent)}
+a.card ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+.note{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Plasma diagnostics · optical emission spectroscopy</div>
+    <h1>Plasma Spectroscopy Teaching Tools</h1>
+    <p>Two browser applications for a course on spectrometers and optical emission spectroscopy of argon plasmas. Nothing to install: open a tool and it runs in your browser. Your data files never leave your computer.</p>
+  </header>
+  <div class="cards">
+    <a class="card" href="czerny-turner-bench/">
+      <h2>Czerny–Turner Bench</h2>
+      <p>Explore how a grating spectrometer works.</p>
+      <ul><li>3D model, cut-away and to-scale ray geometry</li><li>Grating equation, dispersion and resolution with live numbers</li><li>Simulated Ar–H plasma and Hg–Ar lamp spectra</li><li>Doppler and Stark line-width exercises</li></ul>
+    </a>
+    <a class="card" href="oes-analyzer/">
+      <h2>Plasma OES Analyzer</h2>
+      <p>Analyse your own triplicate OES measurements.</p>
+      <ul><li>Background subtraction, mean ± SD</li><li>Peak identification (Ar I, H, O, OH, N₂, N₂⁺)</li><li>Ar I Boltzmann plot with LTE checks</li><li>N₂ rotational (gas) temperature</li><li>Electron density from Ar I 696.5 nm broadening</li></ul>
+    </a>
+  </div>
+  <p class="note">The Czerny–Turner Bench loads three.js and MathJax from public CDNs, so it needs internet access. The OES Analyzer is fully self-contained and also works offline once downloaded. See the README for data-format details and the scientific assumptions behind each analysis.</p>
+</main>
+</body>
+</html>
