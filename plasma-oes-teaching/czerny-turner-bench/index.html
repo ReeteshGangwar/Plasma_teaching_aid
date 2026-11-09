@@ -171,8 +171,12 @@ canvas{display:block;width:100%}
         <div class="glabel">Light source</div>
         <div class="seg" id="srcSeg"><button data-v="plasma" aria-pressed="true">Ar–H plasma</button><button data-v="lamp" aria-pressed="false">Hg–Ar lamp</button></div>
         <div id="plasmaCtl" class="group" style="border-top:0;padding-top:0">
-          <div class="ctl"><div class="row"><label for="Ti">Heavy-particle temperature</label><span class="val" id="TiV"></span></div><input type="range" id="Ti" min="-1.3" max="1.7" step="0.01"></div>
+          <div class="ctl"><div class="row"><label for="Ti">Heavy-particle temperature</label><span class="val" id="TiV"></span></div><input type="range" id="Ti" min="-1.62" max="1.7" step="0.01"></div>
           <div class="ctl"><div class="row"><label for="ne">Electron density</label><span class="val" id="neV"></span></div><input type="range" id="ne" min="19" max="23" step="0.01"></div>
+          <div class="ctl"><div class="row"><label for="Te">Electron temperature</label><span class="val" id="TeV"></span></div><input type="range" id="Te" min="0.3" max="5" step="0.05"></div>
+          <div class="ctl"><div class="row"><label for="P">Gas pressure (Ar)</label><span class="val" id="PV"></span></div><input type="range" id="P" min="-4" max="0" step="0.01"></div>
+          <div class="ctl"><div class="row"><label for="coef">Ar I 696.5 nm Stark coefficient</label></div>
+            <select id="coef"><option value="kunze">Kunze (10.26), Tₑ-dependent</option><option value="lu">Lu et al. 2014: 11.2 pm / 10²² m⁻³</option><option value="griem">Griem formula (JAP 2021 fit, Tₑ 1.7–2.4 eV)</option></select></div>
         </div>
       </div>
     </aside>
@@ -261,10 +265,12 @@ canvas{display:block;width:100%}
         <details class="fx" open>
           <summary>Formulas · line shape and plasma parameters</summary>
           <div class="fx-grid">
-            <div class="fx-item"><span class="t">What the CCD records</span><div class="eq">\[ \begin{gathered} I_{\text{rec}}(\lambda) = \big(I_{\text{true}} \otimes g_{\text{IF}}\big)(\lambda) \\ g_{\text{IF}} = \Pi_{\text{slit}}\otimes\Pi_{\text{pix}}\otimes g_{\text{diff}} \end{gathered} \]</div><div class="num" id="n-conv"></div></div>
+            <div class="fx-item"><span class="t">What the CCD records</span><div class="eq">\[ \begin{gathered} I_{\text{rec}}(\lambda) = \big(I_{\text{true}} \otimes g_{\text{IF}}\big)(\lambda) \\ g_{\text{IF}} = \Pi_{\text{slit}}\otimes\Pi_{\text{pix}}\otimes g_{\text{diff}} \\ L_V(\lambda)=\int L_G(\lambda'-\lambda_0)\,L_L(\lambda-\lambda')\,d\lambda' \end{gathered} \]</div><div class="num" id="n-conv"></div></div>
             <div class="fx-item"><span class="t">Doppler FWHM</span><div class="eq">\[ \begin{gathered} \frac{\Delta\lambda_D}{\lambda_0} = \sqrt{\frac{8k_BT\ln 2}{Mc^2}} \\ \approx 7.16\times10^{-7}\sqrt{\frac{T\,[\mathrm{K}]}{M\,[\mathrm{amu}]}} \end{gathered} \]</div><div class="num" id="n-dop"></div></div>
-            <div class="fx-item"><span class="t">Stark FWHM (Gigosos, González &amp; Cardeñoso 2003 fits; Hβ fit to be checked against the original)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_S^{\mathrm{H}\beta} = 4.8\,\mathrm{nm}\left(\frac{n_e}{10^{23}\,\mathrm{m^{-3}}}\right)^{0.68116} \\ \Delta\lambda_S^{\mathrm{H}\alpha} = 1.098\,\mathrm{nm}\left(\frac{n_e}{10^{23}\,\mathrm{m^{-3}}}\right)^{0.67965} \end{gathered} \]</div><div class="num" id="n-stark"></div></div>
-            <div class="fx-item"><span class="t">Voigt width (Olivero &amp; Longbothum 1977)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_V \approx 0.5346\,\Delta\lambda_L \\ {}+ \sqrt{0.2166\,\Delta\lambda_L^2 + \Delta\lambda_G^2} \end{gathered} \]</div><div class="num" id="n-voigt"></div></div>
+            <div class="fx-item"><span class="t">Stark FWHM: hydrogen (Gigosos et al. 2003; Hβ ≈ Kunze 9.52)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_S^{\mathrm{H}\beta} = 4.8\,\mathrm{nm}\left(\frac{n_e}{10^{23}\,\mathrm{m^{-3}}}\right)^{0.68116} \\ \Delta\lambda_S^{\mathrm{H}\alpha} = 1.098\,\mathrm{nm}\left(\frac{n_e}{10^{23}\,\mathrm{m^{-3}}}\right)^{0.67965} \end{gathered} \]</div></div>
+            <div class="fx-item"><span class="t">Stark FWHM: Ar I 696.5 nm (Kunze 10.26; Griem 9.57)</span><div class="eq">\[ \begin{gathered} \frac{\Delta\lambda_S}{\mathrm{nm}} = 8.50\times10^{-25}\left(\frac{1}{k_BT_e/\mathrm{eV}}\right)^{0.37}\frac{n_e}{\mathrm{m^{-3}}} \\ \Delta\lambda_S = 2w\left[1+1.75A(1-0.75R)\right] \end{gathered} \]</div><div class="num" id="n-stark"></div></div>
+            <div class="fx-item"><span class="t">Van der Waals FWHM, Ar 696.5 nm in Ar (Lee 1975)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_{W} = 8.18\times10^{-12}\lambda_0^2\left(\alpha\overline{R^2}\right)^{2/5}\left(\frac{T_g}{\mu}\right)^{3/10}N_0 \\ \approx 1.535\,\mathrm{nm}\;\frac{P\,[\mathrm{atm}]}{T_g^{0.7}},\quad N_0=\frac{P}{k_BT_g} \end{gathered} \]</div><div class="num" id="n-vdw"></div></div>
+            <div class="fx-item"><span class="t">Voigt width and its inversion (Kunze 9.11)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_V \approx \tfrac{1}{2}\Delta\lambda_L + \sqrt{\tfrac{1}{4}\Delta\lambda_L^2 + \Delta\lambda_G^2} \\ \Delta\lambda_L = \Delta\lambda_V - \frac{\Delta\lambda_G^2}{\Delta\lambda_V},\quad \Delta\lambda_S=\Delta\lambda_L-\Delta\lambda_W \end{gathered} \]</div><div class="num" id="n-voigt"></div></div>
             <div class="fx-item"><span class="t">Removing the instrument (Gaussian approximation)</span><div class="eq">\[ \begin{gathered} \Delta\lambda_D = \sqrt{\Delta\lambda_{\text{rec}}^2 - \Delta\lambda_{\text{IF}}^2} \\ T\,[\mathrm{K}] = M\left(\frac{\Delta\lambda_D}{7.16\times10^{-7}\lambda_0}\right)^2 \end{gathered} \]</div><div class="num" id="n-dec"></div></div>
           </div>
         </details>
@@ -277,6 +283,7 @@ canvas{display:block;width:100%}
           <li><b>Find the pixel limit.</b> At 1800 g/mm, close the slit from 100 µm to 5 µm. The budget bar stops shrinking once the slit term falls below the pixel term. Swap to 13.5 µm pixels and repeat.</li>
           <li><b>Measure an ion temperature.</b> Select Ar II 480.60 nm in the plasma. Lower the temperature until the verdict says the Doppler width is below the instrument limit. Note that temperature, then find a setup (focal length, grating, order) that brings it back.</li>
           <li><b>Stark density from Hβ.</b> Pick Hβ and sweep the electron density from 10¹⁹ to 10²³ m⁻³. Compare the recovered density with the true value. Where does the instrument start to bias the answer?</li>
+          <li><b>Electron density from Ar I 696.5 nm.</b> Press “Ar I 696”, set 1800 g/mm, f = 0.75 m, slit 10 µm and nₑ = 10²² m⁻³. Is the Stark width resolved? Raise the pressure from 1 mbar to 1 atm and watch van der Waals take over. The table also lists the nₑ you would report with each published Stark coefficient (Kunze, Lu, Griem): how large is that spread compared with the instrument error?</li>
           <li><b>Higher order.</b> At 486 nm with 1200 g/mm, compare m = 1 and m = 2. Dispersion doubles, but the reachable range halves; try 2400 g/mm in second order and explain the warning.</li>
         </ol>
       </section>
@@ -304,12 +311,12 @@ const PLASMA = [
   {lam:656.279,I:1.0,sp:'H I (Hα)',M:1.008,stark:'a'},
   {lam:486.135,I:.35,sp:'H I (Hβ)',M:1.008,stark:'b'},
   ...ARII.map(([l,I])=>({lam:l,I,sp:'Ar II',M:39.95})),
-  ...ARI.map(([l,I])=>({lam:l,I:I*.5,sp:'Ar I',M:39.95}))
+  ...ARI.map(([l,I])=>({lam:l,I:I*.5,sp:'Ar I',M:39.95,...(l===696.543?{stark:'ar'}:{})}))
 ];
-const PRESETS = [['Hβ',486.135],['Ar II',480.602],['Hα',656.279],['Hg 578',578.0],['Ar I',811.531],['Hg 436',435.833]];
+const PRESETS = [['Hβ',486.135],['Ar II',480.602],['Hα',656.279],['Ar I 696',696.543],['Hg 578',578.0],['Ar I',811.531],['Hg 436',435.833]];
 
 // ---------- State ----------
-const S = {lam:486.135,G:1800,m:1,f:500,F:6.5,Dv:24,w:25,det:[1024,26],src:'plasma',Ti:Math.log10(2),ne:21,sel:null};
+const S = {lam:486.135,G:1800,m:1,f:500,F:6.5,Dv:24,w:25,det:[1024,26],src:'plasma',Ti:Math.log10(2),ne:21,Te:1.5,P:-1.5,coef:'kunze',sel:null};
 try{ const s = JSON.parse(localStorage.getItem('ctbench')||'null'); if(s && typeof s==='object') Object.assign(S,s); }catch(e){}
 const save = () => { try{ localStorage.setItem('ctbench', JSON.stringify(S)); }catch(e){} };
 
@@ -351,14 +358,23 @@ function instrument(){
   I.ifNm = Math.hypot(I.slitNm,I.pixNm,I.diffNm);
   return I;
 }
-const TiEV = () => 10**S.Ti, NE = () => 10**S.ne;
+const TiEV = () => 10**S.Ti, NE = () => 10**S.ne, PATM = () => 10**S.P;
+// Ar I 696.543 nm: Stark FWHM (nm) for ne in m^-3, Te in eV, and its inverse
+const AR_STARK = {
+  kunze:{ w:(ne,Te)=>8.50e-25*Math.pow(Te,-0.37)*ne, inv:(W,Te)=>W*Math.pow(Te,0.37)/8.50e-25, txt:'8.50×10⁻²⁵ · Tₑ⁻⁰·³⁷ · nₑ' },
+  lu:   { w:(ne)=>0.0112*ne/1e22, inv:(W)=>W/0.0112*1e22, txt:'0.0112 nm · nₑ/10²²' },
+  griem:{ w:(ne)=>ne/(0.99*Math.pow(10,23.83)), inv:(W)=>0.99*Math.pow(10,23.83)*W, txt:'nₑ / (0.99 × 10²³·⁸³)' }
+};
+// van der Waals FWHM of Ar 696.5 nm in Ar (Lee 1975 / Konjević): 8.18e-12 λ²(αR²)^0.4 (Tg/μ)^0.3 N0 = 1.535 nm · P[atm] / Tg^0.7
+const vdW696 = (Patm,TgK) => 1.535*Patm/Math.pow(TgK,0.7);
 function lineWidths(L){
   const T = S.src==='lamp' ? 0.03 : TiEV();
   const D = L.lam*7.16e-7*Math.sqrt(T*EV_K/L.M);
-  let St = 0;
+  let St = 0, V = 0;
   if(S.src==='plasma' && L.stark==='b') St = 4.8*Math.pow(NE()/1e23,0.68116);
   if(S.src==='plasma' && L.stark==='a') St = 1.098*Math.pow(NE()/1e23,0.67965);
-  return {D,St};
+  if(S.src==='plasma' && L.stark==='ar'){ St = AR_STARK[S.coef].w(NE(),S.Te); V = vdW696(PATM(), T*EV_K); }
+  return {D,St,V,Lt:St+V};
 }
 function voigtF(G,L){ return Math.pow(G**5+2.69269*G**4*L+2.42843*G**3*L*L+4.47163*G*G*L**3+0.07842*G*L**4+L**5,0.2); }
 // Add a pseudo-Voigt line (bin-integrated) to arr whose sample i spans [x0+i*dx, x0+(i+1)*dx]
@@ -401,7 +417,7 @@ function simulate(I){
   const vis=[];
   for(const L of linesFor()){
     const xc=I.xOf(L.lam); if(xc===null) continue;
-    const {D,St}=lineWidths(L); const r=I.rldAt(xc);
+    const {D,Lt:St}=lineWidths(L); const r=I.rldAt(xc);
     const fG=Math.hypot(D,L.lam/I.R)/r, fL=St/r;
     if(Math.abs(xc)>I.Ldet/2+Math.max(10*fG,300*fL)) continue;
     addLine(fine,xStart,dx,xc,fG,fL,L.I);
@@ -415,7 +431,7 @@ function simulate(I){
 // High-resolution analysis of one line: true, instrument function, recorded (slit ⊗ pixel), in x (mm)
 function analyse(I,L){
   const xc=I.xOf(L.lam), r=I.rldAt(xc);
-  const {D,St}=lineWidths(L);
+  const {D,St:Sk,V,Lt:St}=lineWidths(L);
   const diff=L.lam/I.R;
   const trueNm = St>0 ? 0.5346*St+Math.sqrt(0.2166*St*St+D*D) : D;
   const scaleNm = Math.max(I.ifNm, trueNm, 1e-4);
@@ -427,7 +443,7 @@ function analyse(I,L){
   const ifn = conv(build(diff/r,0));
   const rec = conv(build(Math.hypot(D,diff)/r, St/r));
   const ifW=fwhmOf(ifn,dx)*r, recW=fwhmOf(rec,dx)*r;
-  return {xc,r,D,St,diff,trueNm,ifW,recW,dx,xs,n,tru,ifn,rec,half};
+  return {xc,r,D,St,Sk,V,diff,trueNm,ifW,recW,dx,xs,n,tru,ifn,rec,half};
 }
 
 // ---------- UI wiring ----------
@@ -435,7 +451,8 @@ const presetsEl=$('presets');
 PRESETS.forEach(([n,l])=>{ const b=document.createElement('button'); b.className='chip'; b.type='button'; b.textContent=n; b.title=l+' nm';
   b.onclick=()=>{ S.lam=l; S.sel=null; sync(); }; presetsEl.appendChild(b); });
 function bindRange(id,key,fmtFn,conv=v=>+v){ const el=$(id); el.addEventListener('input',()=>{ S[key]=conv(el.value); update(); }); }
-bindRange('f','f'); bindRange('F','F'); bindRange('Dv','Dv'); bindRange('w','w'); bindRange('Ti','Ti'); bindRange('ne','ne');
+bindRange('f','f'); bindRange('F','F'); bindRange('Dv','Dv'); bindRange('w','w'); bindRange('Ti','Ti'); bindRange('ne','ne'); bindRange('Te','Te'); bindRange('P','P');
+$('coef').addEventListener('change',e=>{ S.coef=e.target.value; update(); });
 $('lam').addEventListener('input',e=>{ S.lam=+e.target.value; $('lamNum').value=S.lam.toFixed(2); update(); });
 $('lamNum').addEventListener('change',e=>{ const v=+e.target.value; if(v>=150&&v<=1200){ S.lam=v; sync(); } });
 $('G').addEventListener('change',e=>{ S.G=+e.target.value; update(); });
@@ -446,7 +463,7 @@ seg('mSeg','m',Number); seg('srcSeg','src',String);
 
 function sync(){
   $('lam').value=S.lam; $('lamNum').value=(+S.lam).toFixed(2);
-  $('G').value=String(S.G); $('f').value=S.f; $('F').value=S.F; $('Dv').value=S.Dv; $('w').value=S.w; $('Ti').value=S.Ti; $('ne').value=S.ne;
+  $('G').value=String(S.G); $('f').value=S.f; $('F').value=S.F; $('Dv').value=S.Dv; $('w').value=S.w; $('Ti').value=S.Ti; $('ne').value=S.ne; $('Te').value=S.Te; $('P').value=S.P; $('coef').value=S.coef;
   $('det').value=S.det.join(',');
   for(const b of $('mSeg').children) b.setAttribute('aria-pressed', String(+b.dataset.v===S.m));
   for(const b of $('srcSeg').children) b.setAttribute('aria-pressed', String(b.dataset.v===S.src));
@@ -616,7 +633,7 @@ function drawZoom(I,A,sim){
 function update(){
   save();
   $('fV').textContent=`${(S.f/1000).toFixed(2)} m`; $('FV').textContent=`f/${(+S.F).toFixed(1)}`; $('DvV').textContent=`${(+S.Dv).toFixed(1)}°`; $('wV').textContent=`${S.w} µm`;
-  $('TiV').textContent=`${TiEV()<1?TiEV().toFixed(2):TiEV().toFixed(1)} eV`; $('neV').textContent=`${sci(NE())} m⁻³`;
+  $('TiV').textContent=`${TiEV()<1?TiEV().toFixed(2):TiEV().toFixed(1)} eV`; $('neV').textContent=`${sci(NE())} m⁻³`; $('TeV').textContent=`${(+S.Te).toFixed(2)} eV`; { const mb=PATM()*1013.25; $('PV').textContent= mb>=100?`${(PATM()).toFixed(2)} atm`:(mb>=1?`${mb.toFixed(1)} mbar`:`${mb.toFixed(2)} mbar`); }
   $('plasmaCtl').classList.toggle('hidden', S.src!=='plasma');
   const I=instrument();
   drawRay(I);
@@ -1153,7 +1170,7 @@ function drawRO3D(now){
 init3D();
 
 
-const FX_IDS=['n-grat','n-sine','n-ang','n-mag','n-R','n-rld','n-win','n-pp','n-light','n-slit','n-pix','n-diff','n-if','n-conv','n-dop','n-stark','n-voigt','n-dec'];
+const FX_IDS=['n-grat','n-sine','n-ang','n-mag','n-R','n-rld','n-win','n-pp','n-light','n-slit','n-pix','n-diff','n-if','n-conv','n-dop','n-stark','n-vdw','n-voigt','n-dec'];
 const setN=(id,html)=>{ const e=$(id); if(e) e.innerHTML=html; };
 const deg=r=>(r/DEG).toFixed(2)+'°';
 function fillFx(I){
@@ -1175,18 +1192,22 @@ function fillFx(I){
   setN('n-if',`√(${I.slitNm.toFixed(4)}² + ${I.pixNm.toFixed(4)}² + ${I.diffNm.toFixed(4)}²) = ${fmtSmart(I.ifNm)}  (R ≈ ${Math.round(lam/I.ifNm).toLocaleString('en-US')})`);
 }
 function fillLabFx(I,L,A){
-  if(!A){ ['n-conv','n-dop','n-stark','n-voigt','n-dec'].forEach(id=>setN(id,'')); return; }
+  if(!A){ ['n-conv','n-dop','n-stark','n-vdw','n-voigt','n-dec'].forEach(id=>setN(id,'')); return; }
   const T = S.src==='lamp' ? 0.03 : TiEV(), TK=T*EV_K;
   setN('n-conv',`this line: true ${fmtSmart(A.trueNm)} ⊗ IF ${fmtSmart(A.ifW)} → recorded ${fmtSmart(A.recW)}`);
   setN('n-dop',`${L.sp} ${L.lam.toFixed(3)} nm, M = ${L.M} amu, T = ${T<1?T.toFixed(2):T.toFixed(1)} eV = ${Math.round(TK).toLocaleString('en-US')} K<br>7.16×10⁻⁷ × ${L.lam.toFixed(2)} × √(${Math.round(TK)}/${L.M}) = ${fmtSmart(A.D)}`);
+  if(L.stark==='ar'){
+    setN('n-vdw',`P = ${(PATM()*1013.25).toFixed(1)} mbar, T<sub>g</sub> = ${Math.round(TK).toLocaleString('en-US')} K: 1.535 × ${PATM().toExponential(2)} / ${Math.round(TK)}<sup>0.7</sup> = ${fmtSmart(A.V)}`);
+  } else setN('n-vdw', S.src==='plasma' ? 'Computed for Ar I 696.5 nm only (select it).' : 'Lamp lines: negligible.');
   if(A.St>0){
-    const pre = L.stark==='b' ? '4.8' : '1.098', ex = L.stark==='b' ? '0.68116' : '0.67965';
-    setN('n-stark',`nₑ = ${sci(NE())} m⁻³: ${pre} × (${(NE()/1e23).toExponential(2)})^${ex} = ${fmtSmart(A.St)}`);
-    const G=Math.hypot(A.D,A.ifW);
-    setN('n-voigt',`Gaussian part √(Doppler² + IF²) = ${fmtSmart(G)}; Lorentzian = ${fmtSmart(A.St)}<br>0.5346 × ${A.St.toFixed(4)} + √(0.2166 × ${A.St.toFixed(4)}² + ${G.toFixed(4)}²) = ${fmtSmart(0.5346*A.St+Math.sqrt(0.2166*A.St**2+G*G))} (simulated ${fmtSmart(A.recW)})`);
-    setN('n-dec',`Not used for H lines: invert the Voigt relation for Δλ_L instead (see table).`);
+    if(L.stark==='ar') setN('n-stark',`${AR_STARK[S.coef].txt}; nₑ = ${sci(NE())} m⁻³, Tₑ = ${(+S.Te).toFixed(2)} eV → ${fmtSmart(A.Sk)}`);
+    else { const pre = L.stark==='b' ? '4.8' : '1.098', ex = L.stark==='b' ? '0.68116' : '0.67965';
+      setN('n-stark',`Hydrogen: nₑ = ${sci(NE())} m⁻³: ${pre} × (${(NE()/1e23).toExponential(2)})^${ex} = ${fmtSmart(A.St)}`); }
+    const G=Math.hypot(A.D,A.ifW), Vk=0.5*A.St+Math.sqrt(0.25*A.St**2+G*G);
+    setN('n-voigt',`Gaussian √(Doppler² + IF²) = ${fmtSmart(G)}; Lorentzian = ${fmtSmart(A.St)}${L.stark==='ar'?` (Stark ${fmtSmart(A.Sk)} + vdW ${fmtSmart(A.V)})`:''}<br>½ × ${A.St.toFixed(4)} + √(¼ × ${A.St.toFixed(4)}² + ${G.toFixed(4)}²) = ${fmtSmart(Vk)} (simulated ${fmtSmart(A.recW)})`);
+    setN('n-dec',`Not used for Stark lines: invert the Voigt relation for Δλ_L instead (see table).`);
   } else {
-    setN('n-stark', S.src==='plasma' ? `Not applied: Stark width of ${L.sp} lines is negligible here. Select Hβ or Hα.` : 'Lamp lines: no Stark broadening.');
+    setN('n-stark', S.src==='plasma' ? `Not applied: Stark width of ${L.sp} lines is negligible here. Select Hβ, Hα or Ar I 696.5 nm.` : 'Lamp lines: no Stark broadening.');
     setN('n-voigt',`Pure Gaussian line: Δλ_V = Δλ_G = ${fmtSmart(A.D)}`);
     const Dr=Math.sqrt(Math.max(0,A.recW**2-A.ifW**2)); const Tr=L.M*Math.pow(Dr/(7.16e-7*L.lam),2);
     setN('n-dec',`√(${A.recW.toFixed(4)}² − ${A.ifW.toFixed(4)}²) = ${fmtSmart(Dr)}<br>T = ${L.M} × (${Dr.toFixed(5)} / (7.16×10⁻⁷ × ${L.lam.toFixed(2)}))² = ${Math.round(Tr).toLocaleString('en-US')} K = ${(Tr/EV_K).toFixed(2)} eV`);
@@ -1199,7 +1220,7 @@ function renderLab(I,L,A){
   if(!A){ el.innerHTML='<p class="sub">Move the window onto a line to inspect it.</p>'; return; }
   const rows=[
     ['Doppler FWHM', fmtSmart(A.D)],
-    ...(A.St>0?[['Stark FWHM', fmtSmart(A.St)]]:[]),
+    ...(A.St>0?(L.stark==='ar'?[['Stark FWHM', fmtSmart(A.Sk)],['van der Waals FWHM', fmtSmart(A.V)]]:[['Stark FWHM', fmtSmart(A.St)]]):[]),
     ['True line FWHM', fmtSmart(A.trueNm)],
     ['Instrument FWHM (shape)', fmtSmart(A.ifW)],
     ['Recorded FWHM', fmtSmart(A.recW)],
@@ -1209,14 +1230,19 @@ function renderLab(I,L,A){
   if(S.src==='lamp'){
     verdict=`A lamp line is far narrower than the instrument (${fmtSmart(A.D)} vs ${fmtSmart(A.ifW)}), so its recorded shape <b>is</b> the instrument function. This is how you measure the IF before a plasma shot.`;
   } else if(A.St>0){
-    const a=0.5346,b=0.2166, V=A.recW, Gp=Math.hypot(A.ifW,A.D);
-    const qa=a*a-b, disc=4*a*a*V*V-4*qa*(V*V-Gp*Gp);
-    const Lr = disc>0 ? (2*a*V-Math.sqrt(disc))/(2*qa) : NaN;
-    const ner = L.stark==='b' ? 1e23*Math.pow(Lr/4.8,1/0.68116) : 1e23*Math.pow(Lr/1.098,1/0.67965);
+    const V=A.recW, Gp=Math.hypot(A.ifW,A.D);
+    const Lr = V - Gp*Gp/V;                      // Kunze 9.11 inverted
+    const isAr = L.stark==='ar';
+    const Sr = isAr ? Lr - A.V : Lr;             // subtract van der Waals (Ar 696.5 nm)
+    const ner = isAr ? AR_STARK[S.coef].inv(Sr,S.Te) : (L.stark==='b' ? 1e23*Math.pow(Sr/4.8,1/0.68116) : 1e23*Math.pow(Sr/1.098,1/0.67965));
     const err = (ner/NE()-1)*100;
-    rows.push(['Recovered Stark FWHM', fmtSmart(Lr)],['Recovered nₑ', Number.isFinite(ner)&&ner>0?sci(ner)+' m⁻³':'—'],['True nₑ', sci(NE())+' m⁻³']);
-    bad = !(Math.abs(err)<10) || A.St<0.5*A.ifW;
-    verdict = bad ? `The Stark width (${fmtSmart(A.St)}) is ${A.St<A.ifW?'smaller than':'close to'} the instrument function. Recovered density is off by ${Number.isFinite(err)?Math.abs(err).toFixed(0)+'%':'an undefined amount'}: you need a narrower IF or a higher density.` : `Stark broadening dominates; the Voigt deconvolution recovers nₑ within ${Math.abs(err).toFixed(1)}%. (The fit assumes a Gaussian IF of ${fmtSmart(A.ifW)}.)`;
+    if(isAr) rows.push(['Recovered Lorentzian FWHM', fmtSmart(Lr)]);
+    rows.push(['Recovered Stark FWHM', Sr>0?fmtSmart(Sr):'≤ 0'],['Recovered nₑ', Number.isFinite(ner)&&ner>0?sci(ner)+' m⁻³':'—'],['True nₑ', sci(NE())+' m⁻³']);
+    if(isAr && Sr>0) rows.push(['nₑ if analysed with…', ''],...[['kunze','Kunze (10.26)'],['lu','Lu 2014'],['griem','Griem / JAP 2021']].map(([k,n])=>['&nbsp;&nbsp;'+n, sci(AR_STARK[k].inv(Sr,S.Te))+' m⁻³']));
+    const Sk = isAr ? A.Sk : A.St;
+    bad = !(Math.abs(err)<10) || Sk<0.3*A.ifW || (isAr && A.V>Sk);
+    if(isAr && A.V>Sk && !(Sk<0.3*A.ifW)) verdict = `Van der Waals (${fmtSmart(A.V)}) exceeds the Stark width (${fmtSmart(Sk)}) at ${(PATM()*1013.25).toFixed(0)} mbar. nₑ now depends on how well you know P and T<sub>g</sub>: a 10% error in the vdW width moves nₑ by ${(10*A.V/Sk).toFixed(0)}%. Lower the pressure or raise nₑ.`;
+    else verdict = bad ? `The Stark width (${fmtSmart(Sk)}) is ${Sk<A.ifW?'smaller than':'close to'} the instrument function (${fmtSmart(A.ifW)}). Recovered density is off by ${Number.isFinite(err)?Math.abs(err).toFixed(0)+'%':'an undefined amount'}: you need a narrower IF or a higher density.` : `Stark broadening is resolved; inverting the Voigt width${isAr?' and subtracting van der Waals':''} recovers nₑ within ${Math.abs(err).toFixed(1)}%. (Assumes a Gaussian IF of ${fmtSmart(A.ifW)}${isAr?'; coefficient: '+document.querySelector('#coef option:checked').textContent:''}.)`;
   } else {
     const Dr=Math.sqrt(Math.max(0,A.recW**2-A.ifW**2));
     const Tr=L.M*Math.pow(Dr/(7.16e-7*L.lam),2)/EV_K;

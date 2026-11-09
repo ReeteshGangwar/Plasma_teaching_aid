@@ -407,6 +407,22 @@ if(typeof module!=='undefined') Object.assign(module.exports,{lteChecks,mcwhirte
 function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function gaussRand(r){ let u=0,v=0; while(!u) u=r(); while(!v) v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
 const STARK696 = { wS:0.0112 };  // nm FWHM per 1e16 cm^-3 at Te ≈ 1e4 K (default, editable)
+// Ar I 696.543 nm Stark FWHM models. ne in cm^-3, Te in eV, W in nm.
+// kunze : Kunze, Introduction to Plasma Spectroscopy, eq. 10.26  (W = 8.50e-25 nm · Te^-0.37 · ne[m^-3])
+// lu    : linear, W = wS · ne/1e16  (wS = 0.0112 nm reproduces Lu et al., Sci. Rep. 4, 7488, 2014)
+// jap   : fit used in Ananthanarasimhan, Gangwar et al., J. Appl. Phys. 129, 223301 (2021): ne[m^-3] = 0.99·10^23.83·W  (Griem formula, Te 1.7–2.4 eV)
+// griem : Griem/Kunze 9.57 & 9.62 with user w (electron half-halfwidth, nm, at 1e16 cm^-3) and A (ion parameter at 1e16 cm^-3)
+const STARK_MODELS = {
+  kunze:{ name:'Kunze (10.26), Tₑ-dependent', W:(ne,o)=>8.50e-25*Math.pow(o.Te,-0.37)*ne*1e6 },
+  lu:   { name:'Linear w<sub>S</sub> (Lu et al. 2014 default)', W:(ne,o)=>o.wS*ne/1e16 },
+  jap:  { name:'Griem formula, JAP 2021 fit (Tₑ 1.7–2.4 eV)', W:(ne)=>ne*1e6/(0.99*Math.pow(10,23.83)) },
+  griem:{ name:'Griem formula with w, A from tables', W:(ne,o)=>{ const x=ne/1e16, A=o.gA*Math.pow(x,0.25), R=8.34e-5*Math.pow(o.Te,-0.5)*Math.pow(ne*1e6,1/6); return 2*o.gw*x*(1+1.75*A*(1-0.75*R)); } }
+};
+function starkW(model,ne,o){ return STARK_MODELS[model].W(ne,o); }
+function starkNe(model,W,o){ if(!(W>0)) return 0; // invert monotonic W(ne) by bisection in log space
+  let lo=1e10, hi=1e20; for(let k=0;k<100;k++){ const mid=Math.sqrt(lo*hi); if(starkW(model,mid,o)>W) hi=mid; else lo=mid; } return Math.sqrt(lo*hi); }
+// van der Waals FWHM (nm) of Ar 696.5 nm in Ar: Lee et al. 1975 / Konjević: 8.18e-12 λ²(αR²)^0.4 (Tg/μ)^0.3 N0  (cgs; λ in cm, α cm³, R² in a0², N0 cm^-3)
+function vdwLee(lamNm,R2a0,Tg,N0cm3,alpha=16.54e-25,mu=19.97){ const lam=lamNm*1e-7; return 8.18e-12*lam*lam*Math.pow(alpha*R2a0,0.4)*Math.pow(Tg/mu,0.3)*N0cm3*1e7; }
 function makeExample(variant){
   const cfg = variant===0
     ? { name:'Example A — 20 W, 2 slm (synthetic)', T4:8200, T5:8200, Trot:360, Tg:360, sa:{763.511:0.82, 801.479:0.9, 811.531:0.75}, oh:1.0, n2:0.55, n2p:0.08, ha:0.35, hb:0.06, o:0.12, ne:4e15, seed:11 }
@@ -449,4 +465,4 @@ function makeExample(variant){
   for(let k=0;k<3;k++) hb.push({name:`example${variant?'B':'A'}_Ar696_bg_${k+1}.txt`, x:xh, y:Float64Array.from(xh,()=>15+2.5*gaussRand(r))});
   return { name:cfg.name, example:true, plasma, bg, expP:null, expB:null, hr:{plasma:hp, bg:hb, wI}, truth:cfg };
 }
-if(typeof module!=='undefined') Object.assign(module.exports,{makeExample,STARK696});
+if(typeof module!=='undefined') Object.assign(module.exports,{makeExample,STARK696,STARK_MODELS,starkW,starkNe,vdwLee});

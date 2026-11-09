@@ -218,18 +218,30 @@ details.note > div{margin-top:8px;display:flex;flex-direction:column;gap:8px;fon
   <section class="panel" id="t-hr" hidden>
     <div class="row" style="justify-content:space-between"><h2>Electron density from Ar I 696.5 nm line broadening</h2>
       <div class="row"><button class="btn" id="hrPng">Save plot (PNG)</button><button class="btn" id="hrCsv">Export fit CSV</button></div></div>
-    <div class="eq">W<sub>G</sub> = √(W<sub>I</sub>² + W<sub>D</sub>²), &nbsp; W<sub>D</sub> = 7.16×10⁻⁷ λ √(T<sub>g</sub>/M) &nbsp;·&nbsp; Voigt fit → W<sub>L</sub> = W<sub>Stark</sub> + W<sub>vdW</sub><br>
-      W<sub>vdW</sub> = C · (P/1 atm) / T<sub>g</sub><sup>0.7</sup>, &nbsp; C = 7.5×10⁻⁷ λ² ⟨R²⟩<sup>2/5</sup> &nbsp;·&nbsp; n<sub>e</sub> = 10¹⁶ cm⁻³ × W<sub>Stark</sub> / w<sub>S</sub></div>
+    <div class="eq">1 · W<sub>G</sub> = √(W<sub>I</sub>² + W<sub>D</sub>²), &nbsp; W<sub>D</sub> = 7.16×10⁻⁷ λ<sub>0</sub> √(T<sub>g</sub>/M)<br>
+      2 · Voigt (Kunze 9.11): W<sub>V</sub> ≈ ½W<sub>L</sub> + √(¼W<sub>L</sub>² + W<sub>G</sub>²) &nbsp;⇔&nbsp; W<sub>L</sub> = W<sub>V</sub> − W<sub>G</sub>²/W<sub>V</sub> &nbsp;(or a full Voigt fit)<br>
+      3 · W<sub>Stark</sub> = W<sub>L</sub> − W<sub>vdW</sub>, &nbsp; W<sub>vdW</sub> = 8.18×10⁻¹² λ<sub>0</sub>² (α R̄²)<sup>2/5</sup> (T<sub>g</sub>/μ)<sup>3/10</sup> N<sub>0</sub>, &nbsp; N<sub>0</sub> = P/k<sub>B</sub>T<sub>g</sub><br>
+      4 · n<sub>e</sub> from W<sub>Stark</sub>: Kunze (10.26) W = 8.50×10⁻²⁵ nm · T<sub>e</sub><sup>−0.37</sup> · n<sub>e</sub>[m⁻³] &nbsp;|&nbsp; Griem W = 2w[1 + 1.75A(1 − 0.75R)] &nbsp;|&nbsp; linear W = w<sub>S</sub>·n<sub>e</sub>/10¹⁶</div>
     <div class="row">
       <label class="f" for="hrWI"><span>Instrument FWHM W<sub>I</sub> (nm)</span><input type="number" id="hrWI" value="0.025" step="0.001"></label>
       <label class="f"><span>Gas temperature T<sub>g</sub></span><div class="seg" id="tgSeg"><button data-v="rot" aria-pressed="true">From N₂ fit</button><button data-v="manual" aria-pressed="false">Manual</button></div></label>
       <label class="f" for="hrTg"><span>T<sub>g</sub> manual (K)</span><input type="number" id="hrTg" value="400" step="10"></label>
-      <label class="f" for="hrP"><span>Pressure (atm)</span><input type="number" id="hrP" value="1" step="0.05"></label>
-      <label class="f" for="hrWS"><span>Stark w<sub>S</sub> (nm per 10¹⁶ cm⁻³)</span><input type="number" id="hrWS" value="0.0112" step="0.0001"></label>
-      <label class="f" for="hrC"><span>vdW C (nm·K<sup>0.7</sup>)</span><input type="number" id="hrC" step="0.001"></label>
+      <label class="f" for="hrP"><span>Pressure</span><span class="row" style="gap:4px;flex-wrap:nowrap"><input type="number" id="hrP" value="1" step="any" style="width:90px"><select id="hrPu" style="width:auto"><option value="atm">atm</option><option value="mbar">mbar</option><option value="Torr">Torr</option><option value="Pa">Pa</option></select></span></label>
       <label class="f" for="hrCunc"><span>vdW uncertainty (%)</span><input type="number" id="hrCunc" value="15" step="1"></label>
+    </div>
+    <div class="row">
+      <label class="f" for="hrModel"><span>Stark coefficient (n<sub>e</sub> conversion)</span><select id="hrModel" style="width:auto"><option value="kunze">Kunze (10.26), Tₑ-dependent</option><option value="lu">Linear w_S (Lu et al. 2014)</option><option value="jap">Griem formula, JAP 2021 fit (Tₑ 1.7–2.4 eV)</option><option value="griem">Griem formula, my w and A</option></select></label>
+      <label class="f" for="hrTe"><span>T<sub>e</sub> (eV)</span><input type="number" id="hrTe" value="1.5" step="0.1" min="0.2"></label>
+      <label class="f" for="hrWS"><span>w<sub>S</sub> (nm per 10¹⁶ cm⁻³)</span><input type="number" id="hrWS" value="0.0112" step="0.0001"></label>
+      <label class="f" for="hrGw"><span>Griem w (nm, half-width at 10¹⁶)</span><input type="number" id="hrGw" step="any" placeholder="table"></label>
+      <label class="f" for="hrGA"><span>Griem A (at 10¹⁶)</span><input type="number" id="hrGA" step="any" placeholder="table"></label>
+    </div>
+    <div class="row">
       <label class="inline"><input type="checkbox" id="hrFreeG"> Fit Gaussian width too</label>
       <button class="btn primary" id="hrFit">Fit 696.5 nm line</button>
+      <span class="sub" style="margin:0 6px">or, without spectra:</span>
+      <label class="f" for="hrWexp"><span>Measured Voigt FWHM W<sub>V</sub> (nm)</span><input type="number" id="hrWexp" step="any" placeholder="e.g. 0.0736" style="width:120px"></label>
+      <button class="btn" id="hrCalc">Compute from W<sub>V</sub></button>
     </div>
     <div class="grid2">
       <div id="plotHr" class="plot" style="height:420px"></div>
@@ -237,8 +249,9 @@ details.note > div{margin-top:8px;display:flex;flex-direction:column;gap:8px;fon
     </div>
     <div class="tbl-wrap"><table id="hrTbl"></table></div>
     <details class="note"><summary>Parameters, sources and limits</summary><div>
-      <p><b>Stark coefficient:</b> the default w<sub>S</sub> = 0.0112 nm (FWHM at nₑ = 10¹⁶ cm⁻³, Tₑ ≈ 10⁴ K) reproduces the published conversion of Lu et al., Sci. Rep. 4, 7488 (2014): W<sub>Stark</sub> = 0.038 nm ↔ nₑ = 3.4×10¹⁶ cm⁻³. Check it against Konjević &amp; Konjević, Spectrochim. Acta B 52, 2077 (1997) or Griem's tables before using results quantitatively; the electron-temperature dependence and the small ion-broadening term are neglected.</p>
-      <p><b>van der Waals:</b> C follows Yubero et al. (as used in Atoms 5, 41, 2017) with ⟨R²⟩ = ⟨R²<sub>up</sub>⟩ − ⟨R²<sub>low</sub>⟩ from the Coulomb approximation (2p₂ upper, 1s₅ lower): ⟨R²⟩ ≈ 36.6 a₀², C ≈ 1.54 nm·K<sup>0.7</sup>, so W<sub>vdW</sub> ≈ 0.025 nm at 350 K. Resonance broadening is negligible because the lower level (1s₅) is metastable.</p>
+      <p><b>Which Stark coefficient?</b> Published values for Ar I 696.5 nm differ by about a factor of two at 10¹⁶ cm⁻³: Kunze eq. 10.26 gives 8.5 pm at 1 eV (6.6 pm at 2 eV); the linear default 11.2 pm; the Griem-formula fit used by Ananthanarasimhan, Gangwar et al., J. Appl. Phys. 129, 223301 (2021) gives ≈14.9 pm (Tₑ 1.7–2.4 eV). The table below lists nₑ for all of them so the spread is visible; always quote the source and Tₑ. For the full Griem form (Kunze 9.57/9.62), A ∝ nₑ<sup>1/4</sup> and R = 8.34×10⁻⁵ Tₑ<sup>−1/2</sup> nₑ[m⁻³]<sup>1/6</sup>; take w and A from Griem (1974) Table IV or the NIST line-broadening bibliography.</p>
+      <p><b>Linear default:</b> w<sub>S</sub> = 0.0112 nm (FWHM at nₑ = 10¹⁶ cm⁻³, Tₑ ≈ 10⁴ K) reproduces the published conversion of Lu et al., Sci. Rep. 4, 7488 (2014): W<sub>Stark</sub> = 0.038 nm ↔ nₑ = 3.4×10¹⁶ cm⁻³. Check it against Konjević &amp; Konjević, Spectrochim. Acta B 52, 2077 (1997) or Griem's tables before using results quantitatively; the electron-temperature dependence and the small ion-broadening term are neglected.</p>
+      <p><b>van der Waals</b> (Lee et al. 1975; Konjević &amp; Konjević 1997): α = 16.54×10⁻²⁵ cm³ (Ar), μ = 19.97 u, N<sub>0</sub> = P/(k<sub>B</sub>T<sub>g</sub>). This is identical to C·P[atm]/T<sub>g</sub><sup>0.7</sup> with C ≈ 1.54 nm·K<sup>0.7</sup> (Yubero et al., as used in Atoms 5, 41, 2017), with ⟨R²⟩ = ⟨R²<sub>up</sub>⟩ − ⟨R²<sub>low</sub>⟩ from the Coulomb approximation (2p₂ upper, 1s₅ lower): ⟨R²⟩ ≈ 36.6 a₀², C ≈ 1.54 nm·K<sup>0.7</sup>, so W<sub>vdW</sub> ≈ 0.025 nm at 350 K. Resonance broadening is negligible because the lower level (1s₅) is metastable.</p>
       <p><b>Detection limit:</b> at 1 atm the van der Waals width (~0.02–0.03 nm) is much larger than the Stark width below ~10¹⁵ cm⁻³ (≤ 0.001 nm). Small errors in T<sub>g</sub> or C then swamp the Stark part, and the tab reports nₑ as an upper limit. Use a spectrometer with W<sub>I</sub> ≲ 0.03 nm, and measure W<sub>I</sub> with a narrow lamp line near 696 nm at the same slit.</p>
     </div></details>
   </section>

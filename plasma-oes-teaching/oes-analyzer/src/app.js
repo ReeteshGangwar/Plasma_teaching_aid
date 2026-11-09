@@ -14,7 +14,7 @@ const ST = {
   peak:{thr:8, sep:0.3, tol:0.25}, hw:0.35,
   lines: defaultLines(),
   rot:{lo:334.6, hi:337.6, fixW:false, w:0.15},
-  hr:{wI:0.025, tgMode:'rot', Tg:400, P:1, wS:STARK696.wS, C:null, Cunc:15, freeG:false},
+  hr:{wI:0.025, tgMode:'rot', Tg:400, P:1, Pu:'atm', wS:STARK696.wS, C:null, Cunc:15, freeG:false, model:'kunze', Te:1.5, gw:null, gA:null, wExp:null},
   neLTE:null, imode:'area', manual:{}, hideMissing:false
 };
 function defaultLines(){ return AR_BOLTZ_DEFAULT.map(d=>({...d, include: d.src!=='verify' && ![811.531,763.511,419.832,420.068].includes(d.l)})); }
@@ -293,58 +293,88 @@ $('rotCsv').onclick=()=>{ const c=cond(), r=c&&c.res.rot; if(!r||!r.mean) return
 $('moesExp').onclick=()=>{ const c=cond(), P=proc(c); if(!P) return; const lines=['# wavelength_nm\tintensity  (mean net spectrum, '+c.name+')']; for(let i=0;i<P.x.length;i++) lines.push(P.x[i].toFixed(4)+'\t'+P.mean[i].toFixed(3)); saveFile(safe(c.name)+'_massiveOES.txt',lines.join('\n')); };
 
 // ===================== HIGH-RES 696.5 TAB =====================
-$('hrC').value=ST.hr.C;
-['hrWI','hrTg','hrP','hrWS','hrC','hrCunc'].forEach(id=>$(id).onchange=()=>{ ST.hr.wI=+$('hrWI').value; ST.hr.Tg=+$('hrTg').value; ST.hr.P=+$('hrP').value; ST.hr.wS=+$('hrWS').value; ST.hr.C=+$('hrC').value; ST.hr.Cunc=+$('hrCunc').value; });
+const PU={atm:1, mbar:1/1013.25, Torr:1/760, Pa:1/101325};
+const Patm=()=>ST.hr.P*PU[ST.hr.Pu];
+const starkOpts=()=>({Te:ST.hr.Te, wS:ST.hr.wS, gw:ST.hr.gw, gA:ST.hr.gA||0});
+function modelOK(k){ return k!=='griem' || (ST.hr.gw>0); }
+function hrInputs(){ const H=ST.hr; H.wI=+$('hrWI').value; H.Tg=+$('hrTg').value; H.P=+$('hrP').value; H.Pu=$('hrPu').value; H.wS=+$('hrWS').value; H.Cunc=+$('hrCunc').value;
+  H.model=$('hrModel').value; H.Te=+$('hrTe').value||1.5; H.gw=$('hrGw').value===''?null:+$('hrGw').value; H.gA=$('hrGA').value===''?null:+$('hrGA').value; H.wExp=$('hrWexp').value===''?null:+$('hrWexp').value;
+  $('hrWS').closest('label').style.opacity = H.model==='lu'?1:.5; ['hrGw','hrGA'].forEach(id=>$(id).closest('label').style.opacity = H.model==='griem'?1:.5); $('hrTe').closest('label').style.opacity = (H.model==='kunze'||H.model==='griem')?1:.5; }
+['hrWI','hrTg','hrP','hrPu','hrWS','hrCunc','hrModel','hrTe','hrGw','hrGA','hrWexp'].forEach(id=>$(id).onchange=()=>{ hrInputs(); const c=cond(); if(c&&c.res.hr&&!c.res.hr.error){ c.res.hr.manual? calcHr(c): fitHr(c); renderHr(); } });
+hrInputs();
 $('hrFreeG').onchange=e=>{ ST.hr.freeG=e.target.checked; };
 segBind('tgSeg',v=>{ ST.hr.tgMode=v; });
 function tgFor(c){ if(ST.hr.tgMode==='rot' && c.res.rot && Number.isFinite(c.res.rot.T)) return {Tg:c.res.rot.T, sTg:Number.isFinite(c.res.rot.sdT)?c.res.rot.sdT:0, src:'N₂ T<sub>rot</sub>'}; return {Tg:ST.hr.Tg, sTg:0, src:ST.hr.tgMode==='rot'?'manual (no N₂ fit yet)':'manual'}; }
+// Shared step 3–4: Lorentzian → Stark → nₑ (all models), with uncertainty propagation
+function finishHr(base,wL,sWL,reps){ const {Tg,sTg}=base; const H=ST.hr, o=starkOpts();
+  const N0=Patm()*101325/(1.380649e-23*Tg)*1e-6;                       // cm^-3
+  const wV=vdwLee(AR696.l,R2_696,Tg,N0);
+  const model = modelOK(H.model)? H.model : 'kunze';
+  const neOf=W=>starkNe(model,Math.max(0,W),o);
+  const wStark=wL-wV, ne=neOf(wStark);
+  const dVc=wV*H.Cunc/100, dVt=wV*0.7*(sTg/Tg); const sStark=Math.sqrt(sWL*sWL+dVc*dVc+dVt*dVt);
+  const neR=(reps||[]).map(q=>neOf(q.wL-wV));
+  const sne=Math.abs(neOf(wStark+sStark)-neOf(Math.max(1e-7,wStark-sStark)))/2;
+  const all=Object.keys(STARK_MODELS).filter(modelOK).map(k=>({k,name:STARK_MODELS[k].name,ne:starkNe(k,Math.max(0,wStark),o),w16:starkW(k,1e16,o)}));
+  return {...base,wL,N0,wV,wStark,ne,neR,sne,sStark,model,all,upper:wStark<2*sStark,limit:neOf(2*sStark),vdwDom:wV>Math.max(wStark,0)}; }
 function fitHr(c){ const P=procHr(c); if(!P) return null; const {Tg,sTg,src}=tgFor(c);
   const wD=7.16e-7*AR696.l*Math.sqrt(Tg/AR696.M), wG=Math.hypot(ST.hr.wI,wD);
-  const l0=AR696.l; if(l0<P.grid[0]||l0>P.grid[P.grid.length-1]) return {error:'696.5 nm is outside the high-resolution file range.'};
+  const l0=AR696.l; if(l0<P.grid[0]||l0>P.grid[P.grid.length-1]) return (c.res.hr={error:'696.5 nm is outside the high-resolution file range.'});
   const fit=y=>fitVoigtLine(P.grid,y,l0,Math.min(0.45,(P.grid[P.grid.length-1]-P.grid[0])/2-0.02), ST.hr.freeG? null : wG);
-  const m=fit(P.mean); const reps=P.nets.map(fit).filter(Boolean);
-  const wV=ST.hr.C*ST.hr.P/Math.pow(Tg,0.7);
-  const neOf=wL=>Math.max(0,(wL-wV))/ST.hr.wS*1e16;
-  const neR=reps.map(q=>neOf(q.wL)); const ne=neOf(m.wL);
+  const m=fit(P.mean); if(!m) return (c.res.hr={error:'Voigt fit failed: too few points around 696.5 nm.'});
+  const reps=P.nets.map(fit).filter(Boolean);
   const sWL = reps.length>1 ? sdev(reps.map(q=>q.wL)) : 0;
-  const dVc = wV*ST.hr.Cunc/100, dVt = wV*0.7*(sTg/Tg);
-  const sStark=Math.sqrt(sWL*sWL+dVc*dVc+dVt*dVt);
-  const wStark=m.wL-wV;
-  const r={m,reps,Tg,sTg,src,wD,wG,wV,wStark,ne,neR,sne:sStark/ST.hr.wS*1e16, upper: wStark<2*sStark, limit:2*sStark/ST.hr.wS*1e16};
+  const r=finishHr({m,reps,Tg,sTg,src,wD,wG,wVoigt:m.wV,manual:false},m.wL,sWL,reps);
   c.res.hr=r; return r; }
-$('hrFit').onclick=()=>{ const c=cond(); if(!c) return; fitHr(c); renderHr(); };
+// Without spectra: invert Kunze 9.11 from a measured Voigt FWHM
+function calcHr(c){ const {Tg,sTg,src}=tgFor(c); const wD=7.16e-7*AR696.l*Math.sqrt(Tg/AR696.M), wG=Math.hypot(ST.hr.wI,wD); const Wv=ST.hr.wExp;
+  if(!(Wv>0)) return (c.res.hr={error:'Enter the measured Voigt FWHM W<sub>V</sub> (nm).', manual:true});
+  if(Wv<=wG) return (c.res.hr={error:`W<sub>V</sub> (${f(Wv,4)} nm) must be larger than the Gaussian part W<sub>G</sub> (${f(wG,4)} nm).`, manual:true});
+  const wL=Wv-wG*wG/Wv; const r=finishHr({m:null,reps:[],Tg,sTg,src,wD,wG,wVoigt:Wv,manual:true},wL,0,[]); c.res.hr=r; return r; }
+$('hrFit').onclick=()=>{ const c=cond(); if(!c) return; hrInputs(); fitHr(c); renderHr(); };
+$('hrCalc').onclick=()=>{ if(!ST.conds.length){ const c=newCond('Manual width'); ST.conds.push(c); ST.active=ST.conds.length-1; } const c=cond(); hrInputs(); calcHr(c); renderHr(); };
 function renderHr(){
-  const c=cond(); const P=c&&procHr(c);
-  if(!P){ draw('plotHr',[],baseLayout()); $('hrKpis').innerHTML=''; $('hrTbl').innerHTML=''; $('hrStatus').innerHTML='<div class="msg info">Add high-resolution Ar I 696.5 nm files (plasma and background) to this condition in the Data tab.</div>'; return; }
-  const r=c.res.hr, acc=css('--accent'), ink=css('--ink'), mut=css('--muted');
-  if(!r){ draw('plotHr',[{x:Array.from(P.grid),y:Array.from(P.mean),mode:'lines',line:{color:ink,width:1.3},name:'Mean net'}],baseLayout({xaxis:{...baseLayout().xaxis,title:{text:'Wavelength (nm)'}}})); $('hrKpis').innerHTML=''; $('hrTbl').innerHTML=''; $('hrStatus').innerHTML='<div class="msg info">Set the instrument width and gas temperature, then press <b>Fit 696.5 nm line</b>. With "From N₂ fit", run tab 4 first.</div>'; return; }
-  if(r.error){ $('hrStatus').innerHTML=`<div class="msg bad">${r.error}</div>`; return; }
-  const m=r.m;
-  draw('plotHr',[
+  const c=cond(); const P=c&&procHr(c); const r=c&&c.res.hr, acc=css('--accent'), ink=css('--ink'), mut=css('--muted');
+  const blank=msg=>{ draw('plotHr',[],baseLayout()); $('hrKpis').innerHTML=''; $('hrTbl').innerHTML=''; $('hrStatus').innerHTML=msg; };
+  if(!P && !(r&&r.manual)){ blank('<div class="msg info">Add high-resolution Ar I 696.5 nm files (plasma and background) to this condition in the Data tab, or type a measured Voigt FWHM and press <b>Compute from W<sub>V</sub></b>.</div>'); return; }
+  if(!r){ draw('plotHr',[{x:Array.from(P.grid),y:Array.from(P.mean),mode:'lines',line:{color:ink,width:1.3},name:'Mean net'}],baseLayout({xaxis:{...baseLayout().xaxis,title:{text:'Wavelength (nm)'}}})); $('hrKpis').innerHTML=''; $('hrTbl').innerHTML=''; $('hrStatus').innerHTML='<div class="msg info">Set the instrument width, gas temperature, pressure and Stark coefficient, then press <b>Fit 696.5 nm line</b>. With "From N₂ fit", run tab 4 first.</div>'; return; }
+  if(r.error){ if(r.manual) blank(`<div class="msg bad">${r.error}</div>`); else $('hrStatus').innerHTML=`<div class="msg bad">${r.error}</div>`; return; }
+  const m=r.m, H=ST.hr;
+  if(m) draw('plotHr',[
     {x:m.xs,y:m.ys,mode:'markers',marker:{size:4,color:ink},name:'Measured (mean)',xaxis:'x',yaxis:'y'},
     {x:m.xs,y:m.fit,mode:'lines',line:{color:acc,width:2},name:`Voigt: W<sub>L</sub> = ${f(m.wL,4)} nm`,xaxis:'x',yaxis:'y'},
     {x:m.xs,y:m.ys.map((v,i)=>v-m.fit[i]),mode:'lines',line:{color:mut,width:1},showlegend:false,xaxis:'x',yaxis:'y2'}],
     baseLayout({grid:{rows:2,columns:1,pattern:'shared'},xaxis:{...baseLayout().xaxis,title:{text:'Wavelength (nm)'}},yaxis:{...baseLayout().yaxis,domain:[0.3,1]},yaxis2:{...baseLayout().yaxis,domain:[0,0.22],title:{text:'Resid.'}}}));
+  else { // width budget bar chart for the manual route
+    const comp=[['Instrument W<sub>I</sub>',H.wI],['Doppler W<sub>D</sub>',r.wD],['Gaussian W<sub>G</sub>',r.wG],['van der Waals',r.wV],['Stark',Math.max(0,r.wStark)],['Lorentzian W<sub>L</sub>',r.wL],['Voigt W<sub>V</sub>',r.wVoigt]];
+    draw('plotHr',[{type:'bar',orientation:'h',y:comp.map(q=>q[0]).reverse(),x:comp.map(q=>q[1]*1000).reverse(),marker:{color:comp.map((q,i)=>i===4?acc:mut).reverse()},hovertemplate:'%{x:.2f} pm<extra></extra>'}],
+      baseLayout({xaxis:{...baseLayout().xaxis,title:{text:'FWHM (pm)'}},yaxis:{...baseLayout().yaxis,automargin:true},margin:{l:150,r:20,t:20,b:50}})); }
+  const sel=STARK_MODELS[r.model].name;
   $('hrKpis').innerHTML=[
-    ['nₑ (fit to mean)', r.upper? `< ${fe(r.limit)} <small>cm⁻³ (upper limit)</small>` : `${fe(r.ne,2)} <small>± ${fe(r.sne)} cm⁻³</small>`,1],
+    ['nₑ ('+(m?'fit to mean':'from W<sub>V</sub>')+')', r.upper? `< ${fe(r.limit)} <small>cm⁻³ (upper limit)</small>` : `${fe(r.ne,2)} <small>± ${fe(r.sne)} cm⁻³</small>`,1],
     ['nₑ replicates', r.neR.length? `${fe(mean(r.neR),2)} <small>± ${fe(sdev(r.neR))}</small>`:'—'],
-    ['W<sub>Stark</sub>', `${f(r.wStark,4)} <small>nm</small>`], ['W<sub>vdW</sub>', `${f(r.wV,4)} <small>nm</small>`], ['T<sub>g</sub> used', `${f(r.Tg,0)} <small>K (${r.src})</small>`], ['Fit R²', f(m.r2,4)]
+    ['W<sub>Stark</sub>', `${f(r.wStark,4)} <small>nm</small>`], ['W<sub>vdW</sub>', `${f(r.wV,4)} <small>nm</small>`], ['T<sub>g</sub> used', `${f(r.Tg,0)} <small>K (${r.src})</small>`], [m?'Fit R²':'Coefficient', m?f(m.r2,4):({kunze:'Kunze 10.26',lu:'Linear w<sub>S</sub>',jap:'JAP 2021 fit',griem:'Griem w, A'})[r.model]]
   ].map(([k,v,mm])=>`<div class="kpi ${mm?'main':''}"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  $('hrTbl').innerHTML=`<thead><tr><th>Width component</th><th class="num">FWHM (nm)</th><th>How obtained</th></tr></thead><tbody>
-    <tr><td>Instrument W<sub>I</sub></td><td class="num">${f(ST.hr.wI,4)}</td><td>input (measure with a narrow lamp line)</td></tr>
-    <tr><td>Doppler W<sub>D</sub></td><td class="num">${f(r.wD,4)}</td><td>7.16×10⁻⁷ · 696.54 · √(T<sub>g</sub>/39.95)</td></tr>
-    <tr><td>Gaussian W<sub>G</sub></td><td class="num">${f(m.wG,4)}</td><td>${ST.hr.freeG?'fitted':'√(W<sub>I</sub>² + W<sub>D</sub>²), fixed'}</td></tr>
-    <tr><td>Lorentzian W<sub>L</sub></td><td class="num">${f(m.wL,4)}</td><td>Voigt fit (replicate SD ${f(r.reps.length>1?sdev(r.reps.map(q=>q.wL)):NaN,4)})</td></tr>
-    <tr><td>van der Waals W<sub>vdW</sub></td><td class="num">${f(r.wV,4)}</td><td>C·P/T<sub>g</sub><sup>0.7</sup>, C = ${f(ST.hr.C,3)} nm·K<sup>0.7</sup> (±${ST.hr.Cunc}%)</td></tr>
-    <tr><td>Stark W<sub>Stark</sub></td><td class="num">${f(r.wStark,4)}</td><td>W<sub>L</sub> − W<sub>vdW</sub> → nₑ = 10¹⁶ · W<sub>Stark</sub>/${ST.hr.wS}</td></tr>
-    <tr><td>Total Voigt W<sub>V</sub></td><td class="num">${f(m.wV,4)}</td><td>0.5346 W<sub>L</sub> + √(0.2166 W<sub>L</sub>² + W<sub>G</sub>²)</td></tr></tbody>`;
-  const st=[]; if(r.upper) st.push(`<div class="msg warn">The Stark width (${f(r.wStark,4)} nm) is smaller than twice its uncertainty (${f(r.limit*ST.hr.wS/1e16,4)} nm, from replicate scatter, the ±${ST.hr.Cunc}% vdW coefficient and the T<sub>g</sub> uncertainty), so only an upper limit is meaningful.</div>`);
-  if(ST.hr.wI>0.06) st.push('<div class="msg warn">W<sub>I</sub> > 0.06 nm: the Lorentzian part is poorly constrained. A higher-resolution grating or a narrower slit is recommended.</div>');
+  const pStr=`${H.P} ${H.Pu}`;
+  $('hrTbl').innerHTML=`<thead><tr><th>Step / width component</th><th class="num">FWHM (nm)</th><th>How obtained</th></tr></thead><tbody>
+    <tr><td>1 · Instrument W<sub>I</sub></td><td class="num">${f(H.wI,4)}</td><td>input (measure with a narrow lamp line at the same slit)</td></tr>
+    <tr><td>1 · Doppler W<sub>D</sub></td><td class="num">${f(r.wD,4)}</td><td>7.16×10⁻⁷ · 696.54 · √(${f(r.Tg,0)}/39.95)</td></tr>
+    <tr><td>1 · Gaussian W<sub>G</sub></td><td class="num">${f(r.wG,4)}</td><td>${m&&H.freeG?'fitted':'√(W<sub>I</sub>² + W<sub>D</sub>²)'}</td></tr>
+    <tr><td>2 · Voigt W<sub>V</sub></td><td class="num">${f(r.wVoigt,4)}</td><td>${m?'from the Voigt fit':'measured (input)'}</td></tr>
+    <tr><td>2 · Lorentzian W<sub>L</sub></td><td class="num">${f(r.wL,4)}</td><td>${m?`Voigt fit (replicate SD ${f(r.reps.length>1?sdev(r.reps.map(q=>q.wL)):NaN,4)}); check: W<sub>V</sub> − W<sub>G</sub>²/W<sub>V</sub> = ${f(r.wVoigt-r.wG*r.wG/r.wVoigt,4)}`:`W<sub>V</sub> − W<sub>G</sub>²/W<sub>V</sub> = ${f(r.wVoigt,4)} − ${f(r.wG,4)}²/${f(r.wVoigt,4)}`}</td></tr>
+    <tr><td>3 · van der Waals W<sub>vdW</sub></td><td class="num">${f(r.wV,4)}</td><td>Lee formula, P = ${pStr}, T<sub>g</sub> = ${f(r.Tg,0)} K, N<sub>0</sub> = ${fe(r.N0,2)} cm⁻³ (±${H.Cunc}%)</td></tr>
+    <tr><td>3 · Stark W<sub>Stark</sub></td><td class="num">${f(r.wStark,4)}</td><td>W<sub>L</sub> − W<sub>vdW</sub> (± ${f(r.sStark,4)})</td></tr>
+    ${r.all.map(a=>`<tr${a.k===r.model?' style="font-weight:600"':''}><td>4 · nₑ — ${a.name}</td><td class="num">${fe(a.ne,2)}</td><td>cm⁻³; Stark FWHM at 10¹⁶ cm⁻³ = ${f(a.w16*1000,1)} pm${a.k==='kunze'||a.k==='griem'?` (Tₑ = ${H.Te} eV)`:''}${a.k===r.model?' ← used':''}</td></tr>`).join('')}</tbody>`;
+  const st=[]; if(r.upper) st.push(`<div class="msg warn">The Stark width (${f(r.wStark,4)} nm) is smaller than twice its uncertainty (${f(2*r.sStark,4)} nm: replicate scatter, ±${H.Cunc}% vdW and the T<sub>g</sub> uncertainty), so only an upper limit is meaningful.</div>`);
+  if(r.vdwDom) st.push(`<div class="msg warn">van der Waals (${f(r.wV,4)} nm) is larger than the Stark width: nₑ depends strongly on P and T<sub>g</sub>. A 10% error in W<sub>vdW</sub> moves nₑ by ~${f(10*r.wV/Math.max(r.wStark,1e-6),0)}%.</div>`);
+  if(H.model==='griem' && !modelOK('griem')) st.push('<div class="msg warn">Enter Griem w (and A) to use the full Griem formula; Kunze is used meanwhile.</div>');
+  if(H.wI>0.06) st.push('<div class="msg warn">W<sub>I</sub> > 0.06 nm: the Lorentzian part is poorly constrained. A higher-resolution grating or a narrower slit is recommended.</div>');
+  const spread=r.all.map(a=>a.ne).filter(v=>v>0); if(spread.length>1 && r.wStark>0) st.push(`<div class="msg info">Stark-coefficient spread: nₑ = ${fe(Math.min(...spread),1)} – ${fe(Math.max(...spread),1)} cm⁻³ (×${f(Math.max(...spread)/Math.min(...spread),1)}). Quote the source you used.</div>`);
   st.push(`<div class="msg info">This nₑ is used in the McWhirter test on tab 3 (unless you typed a value there).</div>`);
   $('hrStatus').innerHTML=st.join('');
 }
 $('hrPng').onclick=()=>savePlot('plotHr',safe(cond()?.name||'ar696')+'_Ar696_fit.png');
-$('hrCsv').onclick=()=>{ const c=cond(), r=c&&c.res.hr; if(!r||!r.m) return toast('Fit first'); const m=r.m; const rows=[['wavelength_nm','measured_mean','voigt_fit']]; m.xs.forEach((x,i)=>rows.push([x,m.ys[i],m.fit[i]])); rows.push([]); rows.push(['W_L_nm',m.wL,'W_G_nm',m.wG,'W_vdW_nm',r.wV,'W_Stark_nm',r.wStark,'ne_cm-3',r.ne,'sigma_ne',r.sne,'Tg_K',r.Tg]); saveFile(safe(c.name)+'_Ar696_broadening.csv',csv(rows)); };
+$('hrCsv').onclick=()=>{ const c=cond(), r=c&&c.res.hr; if(!r||r.error) return toast('Fit or compute first'); const m=r.m; const rows=[]; if(m){ rows.push(['wavelength_nm','measured_mean','voigt_fit']); m.xs.forEach((x,i)=>rows.push([x,m.ys[i],m.fit[i]])); rows.push([]); } rows.push(['W_L_nm',r.wL,'W_G_nm',r.wG,'W_vdW_nm',r.wV,'W_Stark_nm',r.wStark,'ne_cm-3',r.ne,'sigma_ne',r.sne,'Tg_K',r.Tg,'P',ST.hr.P+' '+ST.hr.Pu,'Stark_model',r.model,'Te_eV',ST.hr.Te]); r.all.forEach(a=>rows.push(['ne_'+a.k+'_cm-3',a.ne])); saveFile(safe(c.name)+'_Ar696_broadening.csv',csv(rows)); };
 
 // ===================== RESULTS TAB =====================
 function ratiosFor(c){ const P=proc(c); if(!P) return null; const out={}; const ref=P.nets.map(y=>windowArea(P.x,y,749.95,750.85));
